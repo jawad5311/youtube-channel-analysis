@@ -1,0 +1,38 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Generated analysis runs and collected data
+runs/*
+data/raw/*
+data/normalized/*
+!runs/.gitkeep
+!data/raw/.gitkeep
+!data/normalized/.gitkeep
+
+# Local configuration and tooling
+.idea/
+.vscode/
+*.code-workspace
+*.log
+*.tmp
+*.swp
+Thumbs.db
+Desktop.ini
+
+# OS-specific files
+.DS_Store

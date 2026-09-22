@@ -1,0 +1,5 @@
+{
+  "api_key_env": "YOUTUBE_API_KEY",
+  "output_root": "runs",
+  "schema_version": "0.1.0"
+}
