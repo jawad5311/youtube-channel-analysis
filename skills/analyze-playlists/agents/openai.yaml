@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Playlists"
+  short_description: "Evaluate YouTube playlist organization"
+  default_prompt: "Use -playlists to evaluate this channel's playlists."

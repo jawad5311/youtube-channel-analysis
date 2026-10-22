@@ -1,4 +1,4 @@
-"""Collect public channel data with YouTube Data API v3.
+"""Collect public channel metadata with YouTube Data API v3.
 
 Run: python -m src.collectors.youtube_data_api https://youtube.com/@GoogleDevelopers
 Set YOUTUBE_API_KEY in the environment or a local .env file.
@@ -15,8 +15,15 @@ from urllib.request import Request, urlopen
 from src.validators.quality import build_quality_report
 
 API = "https://www.googleapis.com/youtube/v3"
-CHANNEL_PARTS = "snippet,contentDetails,statistics,status,topicDetails,brandingSettings"
-VIDEO_PARTS = "snippet,contentDetails,statistics,status,topicDetails,liveStreamingDetails"
+CHANNEL_PARTS = "snippet,statistics,status,topicDetails,brandingSettings"
+CHANNEL_FIELDS = (
+    "items(id,"
+    "snippet(title,description,country),"
+    "statistics(viewCount,subscriberCount,videoCount),"
+    "topicDetails(topicIds,topicCategories),"
+    "status(madeForKids),"
+    "brandingSettings/channel(title,description,keywords,defaultLanguage,country))"
+)
 
 class YouTubeAPIError(RuntimeError): pass
 
@@ -86,44 +93,31 @@ def slug(value: str) -> str:
 
 def collect_channel(channel_input: str, output_root: Path, client: YouTubeClient) -> Path:
     ref = parse_channel_reference(channel_input)
-    channel_response = client.get("channels", part=CHANNEL_PARTS, **{ref.filter_name: ref.filter_value})
+    channel_response = client.get(
+        "channels",
+        part=CHANNEL_PARTS,
+        fields=CHANNEL_FIELDS,
+        **{ref.filter_name: ref.filter_value},
+    )
     if not channel_response.get("items"): raise YouTubeAPIError(f"No channel found for {channel_input!r}.")
     channel = channel_response["items"][0]; channel_id = channel["id"]
     name = channel.get("snippet", {}).get("title", channel_id)
-    uploads = channel.get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads")
-    if not uploads: raise YouTubeAPIError("Channel has no uploads playlist in the response.")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir, raw_dir = output_root / slug(name) / run_id, output_root / slug(name) / run_id / "raw"
     raw_dir.mkdir(parents=True, exist_ok=False); (run_dir / "normalized").mkdir()
     write_json(raw_dir / "channel-response.json", channel_response)
-    playlist_items, ids, token, page = [], [], None, 1
-    while True:
-        response = client.get("playlistItems", part="snippet,contentDetails,status", playlistId=uploads, maxResults=50, pageToken=token)
-        write_json(raw_dir / f"playlist-items-page-{page:04d}.json", response)
-        items = response.get("items", []); playlist_items.extend(items)
-        ids.extend(item["contentDetails"]["videoId"] for item in items if item.get("contentDetails", {}).get("videoId"))
-        token = response.get("nextPageToken")
-        if not token: break
-        page += 1
-    videos = []
-    for number in range(0, len(ids), 50):
-        batch = ids[number:number + 50]
-        response = client.get("videos", part=VIDEO_PARTS, id=",".join(batch), maxResults=50)
-        write_json(raw_dir / f"videos-batch-{number // 50 + 1:04d}.json", response)
-        videos.extend(response.get("items", []))
     collection = {"schema_version": "0.1.0", "requested_input": channel_input, "collected_at": utc_now(),
-                  "channel": channel, "uploads_playlist_id": uploads, "playlist_items": playlist_items, "videos": videos}
-    quality = build_quality_report(channel=channel, playlist_video_ids=ids, videos=videos, pagination_complete=True)
+                  "collection_scope": "channel_metadata", "channel": channel}
+    quality = build_quality_report(channel=channel)
     write_json(run_dir / "normalized" / "collection.json", collection); write_json(run_dir / "quality-report.json", quality)
     manifest = {"schema_version": "0.1.0", "run_id": run_id, "status": "ready" if quality["quality_passed"] else "partial",
                 "requested_input": channel_input, "channel_id": channel_id, "channel_name": name, "collected_at": collection["collected_at"],
-                "uploads_playlist_id": uploads, "playlist_items_found": len(ids), "videos_retrieved": len(videos),
-                "pagination_complete": True, "quality_passed": quality["quality_passed"], "api_requests": client.request_count}
+                "collection_scope": "channel_metadata", "quality_passed": quality["quality_passed"], "api_requests": client.request_count}
     write_json(run_dir / "manifest.json", manifest)
     return run_dir
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Collect public data for one YouTube channel.")
+    parser = argparse.ArgumentParser(description="Collect public metadata for one YouTube channel.")
     parser.add_argument("channel", help="Channel URL, @handle, legacy username URL, or UC channel ID")
     parser.add_argument("--output", default="runs"); parser.add_argument("--timeout", type=int, default=30)
     args = parser.parse_args(); load_dotenv(); key = os.environ.get("YOUTUBE_API_KEY", "")
@@ -131,7 +125,7 @@ def main() -> int:
     try: run_dir = collect_channel(args.channel, Path(args.output), YouTubeClient(key, args.timeout))
     except (ValueError, YouTubeAPIError, OSError) as exc: print(f"ERROR: {exc}", file=sys.stderr); return 1
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    print(f"Collection status: {manifest['status']}\nChannel: {manifest['channel_name']} ({manifest['channel_id']})\nVideos: {manifest['videos_retrieved']} / {manifest['playlist_items_found']}\nRun directory: {run_dir}")
+    print(f"Collection status: {manifest['status']}\nChannel: {manifest['channel_name']} ({manifest['channel_id']})\nScope: {manifest['collection_scope']}\nRun directory: {run_dir}")
     return 0 if manifest["quality_passed"] else 3
 
 if __name__ == "__main__": raise SystemExit(main())

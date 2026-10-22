@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check Video SEO Score"
+  short_description: "Evaluate video SEO and descriptions"
+  default_prompt: "Use -video-seo-score to evaluate the SEO of these YouTube videos."

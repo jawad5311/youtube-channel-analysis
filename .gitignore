@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+*.secret
+secrets/
+credentials/
 
 # Python caches and virtual environments
 __pycache__/
@@ -15,6 +18,8 @@ htmlcov/
 .venv/
 venv/
 env/
+.tox/
+.nox/
 
 # Generated analysis runs and collected data
 runs/*
@@ -23,6 +28,13 @@ data/normalized/*
 !runs/.gitkeep
 !data/raw/.gitkeep
 !data/normalized/.gitkeep
+
+# Local databases, exports, and generated reports
+*.db
+*.sqlite
+*.sqlite3
+exports/
+reports/
 
 # Local configuration and tooling
 .idea/
@@ -33,6 +45,10 @@ data/normalized/*
 *.swp
 Thumbs.db
 Desktop.ini
+.python-version
+dist/
+build/
+*.egg-info/
 
 # OS-specific files
 .DS_Store

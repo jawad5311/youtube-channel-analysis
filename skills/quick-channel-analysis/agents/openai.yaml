@@ -1,0 +1,6 @@
+interface:
+  display_name: "Quick Channel Analysis"
+  short_description: "Analyze a YouTube channel from metadata"
+  default_prompt: "Use $quick-channel-analysis to analyze this YouTube channel: https://youtube.com/@channelhandle"
+policy:
+  allow_implicit_invocation: false
