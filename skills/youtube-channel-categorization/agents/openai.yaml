@@ -1,4 +1,0 @@
-interface:
-  display_name: "YouTube Channel Categorization"
-  short_description: "Categorize YouTube outreach prospects"
-  default_prompt: "Use -channel-categorization to categorize this YouTube channel: https://youtube.com/@channelhandle"
