@@ -1,0 +1,16 @@
+{
+  "channel_categorization": {
+    "channel_name": true,
+    "channel_description": true,
+    "total_videos": 50,
+    "videos": [
+      {
+        "title": true,
+        "description": true
+      }
+    ]
+  },
+  "channel_niche_search": {},
+  "channel_issues": {}
+}
+

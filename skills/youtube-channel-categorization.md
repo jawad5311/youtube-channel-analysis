@@ -8,6 +8,10 @@ metadata:
 
 # YouTube Channel Categorization
 
+## Data source rule
+
+Treat the channel URL as an identifier and matching key. Do not open or browse the URL when the orchestrator has already supplied the channel's collected metadata and evidence. Use the provided API data first, including the channel name, About description, keywords, branding, topic information, external links, and representative video titles. Use browser research only when the supplied evidence is insufficient to distinguish the correct CRM category.
+
 ## 1. Purpose and fixed output labels
 
 Classify a YouTube channel for YT Growth Expert's outreach CRM. The result determines the broad messaging framework for the prospect. This is a custom outreach taxonomy, not a list of YouTube video genres, industries, or niches.
