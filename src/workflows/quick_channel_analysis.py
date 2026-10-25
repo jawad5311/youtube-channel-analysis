@@ -7,10 +7,11 @@ import os
 import sys
 from pathlib import Path
 
+from src.collectors.configured_collection import DEFAULT_PROFILE, collect_configured
+
 from src.analysis.quick_channel import analyze_quick_channel, render_quick_analysis
-from src.analysis.skill_inputs import prepare_skill_inputs
-from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, collect_channel, load_dotenv, write_json
-from src.collectors.youtube_recent_videos import _recent_video_ids, PLAYLIST_FIELDS, PLAYLIST_PARTS
+from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, load_inputs_config, prepare_skill_inputs
+from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, write_json
 
 
 def analyze_collected_run(run_dir: Path) -> Path:
@@ -24,36 +25,17 @@ def analyze_collected_run(run_dir: Path) -> Path:
     return text_path
 
 
-def run(channel_input: str, output_root: Path, client: YouTubeClient) -> Path:
+def run(channel_input: str, output_root: Path, client: YouTubeClient, profile_path: Path = DEFAULT_PROFILE,
+        inputs_path: Path = DEFAULT_CONFIG_PATH) -> Path:
     """Collect channel data and recent videos, generate skill inputs, then run quick analysis."""
-    run_dir = collect_channel(channel_input, output_root, client)
+    load_inputs_config(inputs_path)
+    run_dir, collected = collect_configured(channel_input, output_root, client, profile_path)
     collection_path = run_dir / "normalized" / "collection.json"
     collection = json.loads(collection_path.read_text(encoding="utf-8"))
     channel = collection.get("channel", {})
 
-    # Fetch up to 50 recent videos to supply downstream skills
-    channel_id = channel.get("id", "")
-    uploads_id = "UU" + channel_id[2:] if channel_id.startswith("UC") else None
-    recent_videos: list[dict[str, Any]] = []
-
-    if uploads_id:
-        try:
-            video_ids = _recent_video_ids(uploads_id, client, limit=50, raw_dir=run_dir / "raw")
-            if video_ids:
-                videos_res = client.get(
-                    "videos",
-                    part="snippet,contentDetails",
-                    fields="items(id,snippet(publishedAt,title,description),contentDetails(duration))",
-                    id=",".join(video_ids),
-                    maxResults=50,
-                )
-                write_json(run_dir / "raw" / "recent-videos-response.json", videos_res)
-                v_map = {v.get("id"): v for v in videos_res.get("items", [])}
-                recent_videos = [v_map[vid] for vid in video_ids if vid in v_map]
-        except Exception:
-            pass
-
-    prepare_skill_inputs(run_dir=run_dir, channel_data=channel, recent_videos=recent_videos)
+    prepare_skill_inputs(run_dir=run_dir, channel_data=channel, recent_videos=collected["videos"],
+                         config_path=inputs_path, collected=collected)
     return analyze_collected_run(run_dir)
 
 
@@ -62,6 +44,8 @@ def main() -> int:
     parser.add_argument("channel", help="Channel URL, @handle, legacy username URL, or UC channel ID")
     parser.add_argument("--output", default="runs")
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--collection-config", type=Path, default=DEFAULT_PROFILE)
+    parser.add_argument("--inputs-config", type=Path, default=DEFAULT_CONFIG_PATH)
     args = parser.parse_args()
     load_dotenv()
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
@@ -69,7 +53,8 @@ def main() -> int:
         print("ERROR: Set YOUTUBE_API_KEY in .env or the environment.", file=sys.stderr)
         return 2
     try:
-        analysis_path = run(args.channel, Path(args.output), YouTubeClient(api_key, args.timeout))
+        analysis_path = run(args.channel, Path(args.output), YouTubeClient(api_key, args.timeout),
+                            args.collection_config, args.inputs_config)
     except (ValueError, YouTubeAPIError, OSError, KeyError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

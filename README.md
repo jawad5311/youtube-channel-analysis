@@ -26,6 +26,37 @@ The `.env` file and generated run data are excluded from Git.
 python -m src.workflows.quick_channel_analysis https://youtube.com/@channelhandle
 ```
 
+## Collection and skill inputs
+
+`config/quick-channel-collection.json` controls API collection fields and counts.
+`config/quick-analysis-inputs.json` selects which collected fields are written for
+each configured skill. Empty skill sections are skipped. False fields are omitted;
+missing requested values are reported in `missing_data` rather than fetched again.
+
+```powershell
+python -m src.workflows.quick_channel_analysis https://youtube.com/@channelhandle --collection-config config/quick-channel-collection.json --inputs-config config/quick-analysis-inputs.json
+```
+
+Collected data is saved in `normalized/collection.json`. Skill packages are saved as
+`normalized/data-for-channel-categorization.json`, `data-for-channel-niche-search.json`,
+and `data-for-channel-issues.json`, relative to that same normalized directory.
+Skill record selectors use a one-item list such as `"videos": [{"title": true}]`,
+with optional `total_videos`, `total_shorts`, `total_playlists`, and
+`total_community_posts` limits. Channel selectors include `channel_name`,
+`channel_description`, `channel_tags`, `country`, and `subscriber_count`.
+
+The API collector cannot confirm Shorts from duration alone. It saves uploads over
+180 seconds as videos and shorter uploads as unconfirmed Shorts candidates. Duration
+is requested internally for classification even when omitted from output fields.
+IDs are used internally for API requests but excluded from skill packages.
+
+Community posts are not collected by the API worker. When enabled, a
+`browser-collection-request.json` handoff is saved with the configured limit and
+coverage requirements. The community status stays `pending_browser` until browser
+collection is performed. Activity coverage settings do not override item limits or
+claim that sufficient history has been obtained. Thumbnail and banner fields save
+image URLs; they do not download image files or perform visual analysis.
+
 ## Run tests
 
 ```powershell

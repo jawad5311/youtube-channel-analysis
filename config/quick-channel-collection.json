@@ -1,0 +1,54 @@
+{
+  "channel": {
+    "name": true,
+    "description": true,
+    "tags": true,
+    "country": true,
+    "subscriber_count": true,
+    "branding_title": true,
+    "branding_description": true,
+    "topic_categories": true,
+    "banner_image": true
+  },
+  "videos": {
+    "limit": 50,
+    "fields": [
+      "title",
+      "description",
+      "tags",
+      "duration",
+      "publishedAt",
+      "thumbnails",
+      "viewCount",
+      "liveBroadcastContent"
+    ]
+  },
+  "shorts": {
+    "limit": 50,
+    "fields": [
+      "title",
+      "description",
+      "tags",
+      "publishedAt"
+    ]
+  },
+  "playlists": {
+    "enabled": true,
+    "fields": ["title", "description", "itemCount"]
+  },
+  "community_posts": {
+    "enabled": true,
+    "source": "browser",
+    "limit": 10,
+    "fields": ["text", "publishedAt", "pinned"]
+  },
+  "activity_coverage": {
+    "preferred_complete_weeks": 8,
+    "minimum_complete_weeks": 4,
+    "recent_days": 30,
+    "record_collection_date": true,
+    "record_coverage_boundaries": true,
+    "record_collection_status": true
+  },
+  "max_uploads_to_scan": 300
+}
