@@ -9,6 +9,7 @@ from typing import Any
 from src.collectors.youtube_data_api import write_json
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config/quick-analysis-inputs.json"
+DEFAULT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "config/skill-manifest.json"
 SKILL_SECTIONS = {
     "channel_categorization": "categorization",
     "channel_niche_search": "niche_search",
@@ -17,31 +18,40 @@ SKILL_SECTIONS = {
 }
 
 
-def prepare_skill_outputs(run_dir: Path, config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Path]:
+def load_skill_manifest(manifest_path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Any]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("skills"), list):
+        raise ValueError("Skill manifest must contain a skills list.")
+    return manifest
+
+
+def _manifest_entries(manifest_path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, dict[str, Any]]:
+    return {entry["name"]: entry for entry in load_skill_manifest(manifest_path)["skills"]}
+
+
+def prepare_skill_outputs(run_dir: Path, config_path: Path = DEFAULT_CONFIG_PATH,
+                          manifest_path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Path]:
     """Create one output placeholder for every configured skill."""
     config = load_inputs_config(config_path)
     output_dir = run_dir / "skill-outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
-    channel_issues_output_dir = output_dir / "channel-issues"
-    channel_issues_output_dir.mkdir(parents=True, exist_ok=True)
+    entries = _manifest_entries(manifest_path)
     created: dict[str, Path] = {}
 
-    def create(skill_name: str, filename: str) -> None:
-        path = output_dir / filename
+    def create(skill_name: str) -> None:
+        if skill_name not in entries:
+            raise ValueError(f"Skill {skill_name} is missing from the manifest.")
+        path = run_dir / entries[skill_name]["output"]
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("", encoding="utf-8")
         created[skill_name] = path
 
     if config.get("channel_categorization"):
-        create("channel-categorization", "channel-categorization-output.md")
+        create("youtube-channel-categorization")
     if config.get("channel_niche_search"):
-        create("channel-niche-search", "channel-niche-search-output.md")
+        create("find-channel-niches")
     for skill_name in config.get("channel_issues", {}):
-        if skill_name == "skill_input_file":
-            continue
-        filename = skill_name + "-output.md"
-        path = channel_issues_output_dir / filename
-        path.write_text("", encoding="utf-8")
-        created[skill_name] = path
+        create(skill_name)
     return created
 
 
@@ -184,7 +194,7 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
     if not isinstance(config, dict):
         raise ValueError("Skill configuration must be an object.")
     sections = {"videos", "shorts", "playlists", "community_posts"}
-    allowed = set(CHANNEL_PATHS) | sections | {"skill_input_file", "max_age_months", "high_view_outliers", "low_view_outliers", "total_videos", "total_shorts", "total_playlists", "total_community_posts", "collection_metadata"}
+    allowed = set(CHANNEL_PATHS) | sections | {"max_age_months", "high_view_outliers", "low_view_outliers", "total_videos", "total_shorts", "total_playlists", "total_community_posts", "collection_metadata"}
     if set(config) - allowed:
         raise ValueError(f"Unsupported skill-input fields: {sorted(set(config) - allowed)}")
     output, missing = {}, []
@@ -249,9 +259,15 @@ def prepare_skill_inputs(
     recent_videos: list[dict[str, Any]],
     config_path: Path = DEFAULT_CONFIG_PATH,
     collected: dict[str, Any] | None = None,
+    manifest_path: Path = DEFAULT_MANIFEST_PATH,
 ) -> dict[str, Path]:
     """Generates the required skill input files in run_dir/normalized."""
     config = load_inputs_config(config_path)
+    entries = _manifest_entries(manifest_path)
+    section_skills = {
+        "channel_categorization": "youtube-channel-categorization",
+        "channel_niche_search": "find-channel-niches",
+    }
     normalized_dir = run_dir / "normalized"
     normalized_dir.mkdir(parents=True, exist_ok=True)
     created_files: dict[str, Path] = {}
@@ -261,33 +277,37 @@ def prepare_skill_inputs(
         rule = config.get(section, {})
         if not isinstance(rule, dict):
             raise ValueError(f"{section} must be an object.")
-        skill_input_file = rule.get("skill_input_file")
-        if skill_input_file is not None:
-            if not isinstance(skill_input_file, str) or not skill_input_file.strip():
-                raise ValueError(f"{section}.skill_input_file must be a relative path in normalized/.")
-            output_path = (normalized_dir / skill_input_file).resolve()
-            if output_path.parent != normalized_dir.resolve() and not str(output_path).startswith(str(normalized_dir.resolve()) + "\\"):
-                raise ValueError(f"{section}.skill_input_file must stay inside normalized/.")
-        if section == "channel_issues" and rule and all(isinstance(value, dict) for name, value in rule.items() if name != "skill_input_file"):
+        if section == "channel_issues" and rule and all(isinstance(value, dict) for value in rule.values()):
             for skill, selection in rule.items():
-                if skill == "skill_input_file" or not selection:
+                if not selection:
                     continue
-                child_file = selection.get("skill_input_file")
-                if not child_file:
-                    raise ValueError(f"{skill}.skill_input_file is required.")
-                child_path = (normalized_dir / child_file).resolve()
+                if skill not in entries:
+                    raise ValueError(f"Skill {skill} is missing from the manifest.")
+                child_path = (run_dir / entries[skill]["input"]).resolve()
                 if not str(child_path).startswith(str(normalized_dir.resolve()) + "\\"):
-                    raise ValueError(f"{skill}.skill_input_file must stay inside normalized/.")
-                clean_selection = {k: v for k, v in selection.items() if k != "skill_input_file"}
+                    raise ValueError(f"Manifest input for {skill} must stay inside normalized/.")
+                clean_selection = selection
                 data = (build_performance_skill_data(channel_data, recent_videos, clean_selection, collected)
                         if skill == "performance-analysis-skill" else
                         build_skill_data(channel_data, recent_videos, clean_selection, collected))
                 prepared.append((skill, child_path, data))
+        elif section == "channel_issues" and rule:
+            skill_name = "channel-issues-orchestrator"
+            if skill_name not in entries:
+                raise ValueError(f"Skill {skill_name} is missing from the manifest.")
+            input_path = (run_dir / entries[skill_name]["input"]).resolve()
+            if not str(input_path).startswith(str(normalized_dir.resolve()) + "\\"):
+                raise ValueError(f"Manifest input for {skill_name} must stay inside normalized/.")
+            prepared.append(("issues", input_path, build_skill_data(channel_data, recent_videos, rule, collected)))
         elif rule:
-            selection = {k: v for k, v in rule.items() if k != "skill_input_file"}
-            if not skill_input_file:
-                raise ValueError(f"{section}.skill_input_file is required.")
-            prepared.append((key, normalized_dir / skill_input_file, build_skill_data(channel_data, recent_videos, selection, collected)))
+            skill_name = section_skills[section]
+            if skill_name not in entries:
+                raise ValueError(f"Skill {skill_name} is missing from the manifest.")
+            selection = rule
+            input_path = (run_dir / entries[skill_name]["input"]).resolve()
+            if not str(input_path).startswith(str(normalized_dir.resolve()) + "\\"):
+                raise ValueError(f"Manifest input for {skill_name} must stay inside normalized/.")
+            prepared.append((key, input_path, build_skill_data(channel_data, recent_videos, selection, collected)))
     for key, path, data in prepared:
         write_json(path, data)
         created_files[key] = path

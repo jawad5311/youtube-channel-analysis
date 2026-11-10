@@ -18,7 +18,7 @@ Run each check only when its required evidence is available:
 ## Workflow order
 
 Use `config/quick-analysis-inputs.json` as the source of truth for the enabled
-channel-issues skills, their `skill_input_file` paths, and their data fields.
+channel-issues skills, their manifest-defined input paths, and their data fields.
 Run the configured skills in the same object order shown in that file. For
 every step, read the skill's configured input from the current run, provide
 that data to the matching skill, wait for the skill to finish, and save its

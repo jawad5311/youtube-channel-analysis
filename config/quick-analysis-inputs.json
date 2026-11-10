@@ -1,6 +1,5 @@
 {
   "channel_categorization": {
-    "skill_input_file": "data-for-channel-categorization-skill.json",
     "channel_name": true,
     "channel_description": true,
     "channel_keywords": true,
@@ -14,7 +13,6 @@
     ]
   },
   "channel_niche_search": {
-    "skill_input_file": "data-for-channel-niche-search-skill.json",
     "channel_name": true,
     "channel_description": true,
     "channel_keywords": true,
@@ -29,7 +27,6 @@
   },
   "channel_issues": {
     "performance-analysis-skill": {
-      "skill_input_file": "channel-issues/data-for-performance-analysis-skill.json",
       "total_videos": 20,
       "high_view_outliers": 2,
       "low_view_outliers": 0,
@@ -43,7 +40,6 @@
       ]
     },
     "check-video-seo-score": {
-      "skill_input_file": "channel-issues/data-for-video-seo-score-skill.json",
       "total_videos": 50,
       "videos": [
         {
@@ -54,7 +50,6 @@
       ]
     },
     "analyze-shorts-activity": {
-      "skill_input_file": "channel-issues/data-for-shorts-activity-skill.json",
       "total_shorts": 50,
       "shorts": [
         {
@@ -65,7 +60,6 @@
       ]
     },
     "thumbnail-analysis-skill": {
-      "skill_input_file": "channel-issues/data-for-thumbnail-analysis-skill.json",
       "total_videos": 50,
       "videos": [
         {
@@ -75,7 +69,6 @@
       ]
     },
     "analyze-playlists": {
-      "skill_input_file": "channel-issues/data-for-playlist-analysis-skill.json",
       "total_playlists": 50,
       "playlists": [
         {
@@ -85,11 +78,8 @@
         }
       ]
     },
-    "analyze-community-activity": {
-      "skill_input_file": "channel-issues/data-for-community-activity-skill.json"
-    },
+    "analyze-community-activity": {},
     "content-strategy-analysis-skill": {
-      "skill_input_file": "channel-issues/data-for-content-strategy-analysis-skill.json",
       "total_videos": 50,
       "videos": [
         {
@@ -100,7 +90,6 @@
       ]
     },
     "video-seo-analysis-skill": {
-      "skill_input_file": "channel-issues/data-for-video-seo-analysis-skill.json",
       "total_videos": 50,
       "videos": [
         {
@@ -110,9 +99,6 @@
         }
       ]
     },
-    "channel-issues-orchestrator": {
-      "skill_input_file": "channel-issues/data-for-channel-issues-skill.json"
-    }
+    "channel-issues-orchestrator": {}
   }
 }
-

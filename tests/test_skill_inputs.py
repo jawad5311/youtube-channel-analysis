@@ -32,7 +32,6 @@ class SkillInputsTests(unittest.TestCase):
         ]
         self.config = {
             "channel_categorization": {
-                "skill_input_file": "data-for-channel-categorization.json",
                 "channel_name": True,
                 "channel_description": True,
                 "total_videos": 50,
@@ -73,7 +72,7 @@ class SkillInputsTests(unittest.TestCase):
                 config_path=cfg_file,
             )
 
-            cat_file = run_dir / "normalized" / "data-for-channel-categorization.json"
+            cat_file = run_dir / "normalized" / "data-for-channel-categorization-skill.json"
             self.assertTrue(cat_file.exists())
             loaded = json.loads(cat_file.read_text(encoding="utf-8"))
             self.assertEqual(loaded["channel_name"], "Kidney Coach")

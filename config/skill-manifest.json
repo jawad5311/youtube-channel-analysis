@@ -31,7 +31,7 @@
       "instructions": "skills/channel-issues/performance-analysis-skill.md",
       "input": "normalized/channel-issues/data-for-performance-analysis-skill.json",
       "output": "skill-outputs/channel-issues/performance-analysis-skill-output.md",
-      "required": false,
+      "required": true,
       "order": 3
     },
     {
