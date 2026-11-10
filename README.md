@@ -16,7 +16,16 @@ A modular YouTube channel analysis project with shared collectors, focused analy
 1. Create a virtual environment.
 2. Install the dependencies from `requirements.txt`.
 3. Copy `.env.example` to `.env`.
-4. Set `YOUTUBE_API_KEY` in `.env`.
+4. Set `YOUTUBE_API_KEY` in `.env`, or set `YOUTUBE_API_KEY_FILE` to a separate
+   text file containing only the key. Relative key-file paths are resolved from
+   the `.env` file's folder.
+
+You can also paste the path directly into the root-level `api-key-path.txt`
+file. Put one path on one line. The workflow reads this file automatically
+when no API key is already set.
+
+Country output uses common CRM-friendly names for GoHighLevel, including
+`United States`, `United Kingdom`, `South Korea`, and `Russia`.
 
 The `.env` file and generated run data are excluded from Git.
 

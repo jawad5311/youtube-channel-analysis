@@ -8,10 +8,6 @@ metadata:
 
 # YouTube Channel Categorization
 
-## Data source rule
-
-Treat the channel URL as an identifier and matching key. Do not open or browse the URL when the orchestrator has already supplied the channel's collected metadata and evidence. Use the provided API data first, including the channel name, About description, keywords, branding, topic information, external links, and representative video titles. Use browser research only when the supplied evidence is insufficient to distinguish the correct CRM category.
-
 ## 1. Purpose and fixed output labels
 
 Classify a YouTube channel for YT Growth Expert's outreach CRM. The result determines the broad messaging framework for the prospect. This is a custom outreach taxonomy, not a list of YouTube video genres, industries, or niches.
@@ -276,6 +272,31 @@ Before responding, verify:
 - No unsupported claim of perfect accuracy is made.
 
 ## 10. CRM use and scope
+
+## 11. Run output storage
+
+For a single-channel project run, save the final category to:
+
+```text
+<run-root>/skill-outputs/channel-categorization-output.md
+```
+
+`<run-root>` is the specific timestamped run directory selected by the
+orchestrator, for example:
+
+```text
+runs/lifestyle-mapping/20261106T131703184820Z/
+```
+
+The resulting file is therefore:
+
+```text
+runs/lifestyle-mapping/20261106T131703184820Z/skill-outputs/channel-categorization-output.md
+```
+
+Write exactly the one allowed category label followed by a newline. The skill
+must use the run root supplied by the orchestrator; it must not guess the
+channel folder or run ID and must not write to a previous run.
 
 Target field: `Prospect Category`.
 

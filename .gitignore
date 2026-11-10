@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+api-key-path.txt
 *.secret
 secrets/
 credentials/

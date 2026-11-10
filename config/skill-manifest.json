@@ -1,0 +1,114 @@
+{
+  "version": "1.0",
+  "workflow": "quick-channel-analysis",
+  "instructions_relative_to": "project_root",
+  "data_paths_relative_to": "run_root",
+  "parent_skill": {
+    "name": "quick-channel-analysis",
+    "instructions": "skills/quick-channel-analysis.md",
+    "required": true
+  },
+  "skills": [
+    {
+      "name": "youtube-channel-categorization",
+      "instructions": "skills/youtube-channel-categorization.md",
+      "input": "normalized/data-for-channel-categorization-skill.json",
+      "output": "skill-outputs/channel-categorization-output.md",
+      "required": true,
+      "order": 1
+    },
+    {
+      "name": "find-channel-niches",
+      "instructions": "skills/find-channel-niches.md",
+      "input": "normalized/data-for-channel-niche-search-skill.json",
+      "output": "skill-outputs/channel-niche-search-output.md",
+      "required": true,
+      "order": 2
+    },
+    {
+      "name": "performance-analysis-skill",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/performance-analysis-skill.md",
+      "input": "normalized/channel-issues/data-for-performance-analysis-skill.json",
+      "output": "skill-outputs/channel-issues/performance-analysis-skill-output.md",
+      "required": false,
+      "order": 3
+    },
+    {
+      "name": "check-video-seo-score",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/check-video-seo-score.md",
+      "input": "normalized/channel-issues/data-for-video-seo-score-skill.json",
+      "output": "skill-outputs/channel-issues/check-video-seo-score-output.md",
+      "required": false,
+      "order": 4
+    },
+    {
+      "name": "analyze-shorts-activity",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/analyze-shorts-activity.md",
+      "input": "normalized/channel-issues/data-for-shorts-activity-skill.json",
+      "output": "skill-outputs/channel-issues/analyze-shorts-activity-output.md",
+      "required": false,
+      "order": 5
+    },
+    {
+      "name": "thumbnail-analysis-skill",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/thumbnail-analysis-skill.md",
+      "input": "normalized/channel-issues/data-for-thumbnail-analysis-skill.json",
+      "output": "skill-outputs/channel-issues/thumbnail-analysis-skill-output.md",
+      "required": false,
+      "order": 6
+    },
+    {
+      "name": "analyze-playlists",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/analyze-playlists.md",
+      "input": "normalized/channel-issues/data-for-playlist-analysis-skill.json",
+      "output": "skill-outputs/channel-issues/analyze-playlists-output.md",
+      "required": false,
+      "order": 7
+    },
+    {
+      "name": "analyze-community-activity",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/analyze-community-activity.md",
+      "input": "normalized/channel-issues/data-for-community-activity-skill.json",
+      "output": "skill-outputs/channel-issues/analyze-community-activity-output.md",
+      "required": false,
+      "order": 8
+    },
+    {
+      "name": "content-strategy-analysis-skill",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/content-strategy-analysis-skill.md",
+      "input": "normalized/channel-issues/data-for-content-strategy-analysis-skill.json",
+      "output": "skill-outputs/channel-issues/content-strategy-analysis-skill-output.md",
+      "required": false,
+      "order": 9
+    },
+    {
+      "name": "video-seo-analysis-skill",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/video-seo-analysis-skill.md",
+      "input": "normalized/channel-issues/data-for-video-seo-analysis-skill.json",
+      "output": "skill-outputs/channel-issues/video-seo-analysis-skill-output.md",
+      "required": false,
+      "order": 10
+    },
+    {
+      "name": "channel-issues-orchestrator",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/channel-issues-orchestrator.md",
+      "input": "normalized/channel-issues/data-for-channel-issues-skill.json",
+      "output": "skill-outputs/channel-issues/channel-issues-orchestrator-output.md",
+      "required": false,
+      "order": 11
+    }
+  ],
+  "validation": {
+    "require_non_empty_outputs": true,
+    "allow_extra_output_text": false
+  }
+}

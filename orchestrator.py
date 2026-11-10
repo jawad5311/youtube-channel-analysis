@@ -1,230 +1,88 @@
+"""Collect one YouTube channel and prepare the skill handoff for Codex."""
 from __future__ import annotations
 
 import argparse
 import json
-import re
+import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+
+from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, prepare_skill_inputs, prepare_skill_outputs
+from src.collectors.configured_collection import DEFAULT_PROFILE, collect_configured
+from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, write_json
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SKILL_MANIFEST_PATH = PROJECT_ROOT / "config" / "skill-manifest.json"
 
 
-# Replace these demo functions with real YouTube API collectors and agent calls.
-
-def resolve_channel(channel_url: str) -> dict[str, str]:
-    """Resolve a URL/handle to a channel record.
-
-    In production, use YouTube Data API v3. This demo derives a safe display name
-    and uses a placeholder channel ID.
-    """
-    parsed = urlparse(channel_url)
-    if parsed.scheme not in {"http", "https"} or "youtube.com" not in parsed.netloc:
-        raise ValueError("Provide a YouTube URL such as https://youtube.com/@channel")
-
-    handle = parsed.path.strip("/").split("/")[-1] or "channel"
-    display_name = handle.removeprefix("@").replace("-", " ").title()
-    return {
-        "channel_id": "DEMO_CHANNEL_ID",
-        "channel_url": channel_url,
-        "channel_name": display_name,
-    }
+def load_skill_manifest(path: Path = SKILL_MANIFEST_PATH) -> dict[str, Any]:
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("skills"), list):
+        raise ValueError("Skill manifest must contain a skills list.")
+    return manifest
 
 
-def collect_channel_data(channel: dict[str, str]) -> dict[str, Any]:
-    """Collect channel-level data. Replace with channels.list API call."""
-    return {
-        **channel,
-        "subscriber_count": None,
-        "view_count": None,
-        "video_count": 3,
-        "collected_at": utc_now(),
-        "demo": True,
-    }
+def resolve_skill_manifest(manifest: dict[str, Any], project_root: Path, run_root: Path) -> dict[str, Any]:
+    resolved = dict(manifest)
+    parent = dict(manifest.get("parent_skill", {}))
+    if parent.get("instructions"):
+        parent["instructions"] = str((project_root / parent["instructions"]).resolve())
+    resolved["parent_skill"] = parent
+    skills = []
+    for skill in sorted(manifest["skills"], key=lambda item: item.get("order", 0)):
+        item = dict(skill)
+        item["instructions"] = str((project_root / item["instructions"]).resolve())
+        item["input"] = str((run_root / item["input"]).resolve())
+        item["output"] = str((run_root / item["output"]).resolve())
+        skills.append(item)
+    resolved["skills"] = skills
+    resolved["run_root"] = str(run_root.resolve())
+    return resolved
 
 
-def collect_video_data(channel: dict[str, str]) -> list[dict[str, Any]]:
-    """Collect uploaded videos. Replace with uploads playlist pagination."""
-    return [
-        {
-            "video_id": "demo001",
-            "title": "How to Build a YouTube Channel",
-            "published_at": "2026-08-01T12:00:00Z",
-            "duration_seconds": 620,
-            "views": 12000,
-            "likes": 700,
-            "comments": 85,
-            "format": "long_form",
-        },
-        {
-            "video_id": "demo002",
-            "title": "YouTube SEO Tips in 60 Seconds",
-            "published_at": "2026-08-15T12:00:00Z",
-            "duration_seconds": 58,
-            "views": 28000,
-            "likes": 1100,
-            "comments": 60,
-            "format": "short",
-        },
-        {
-            "video_id": "demo003",
-            "title": "Channel Analytics Explained",
-            "published_at": "2026-09-01T12:00:00Z",
-            "duration_seconds": 480,
-            "views": 9000,
-            "likes": 430,
-            "comments": 42,
-            "format": "long_form",
-        },
-    ]
+def write_run_manifest(run_root: Path) -> Path:
+    path = run_root / "manifest.json"
+    write_json(path, resolve_skill_manifest(load_skill_manifest(), PROJECT_ROOT, run_root))
+    return path
 
 
-def collect_activity_data(channel: dict[str, str]) -> dict[str, Any]:
-    """Collect public activity such as playlists/comments where available."""
-    return {
-        "public_playlists_found": 0,
-        "comments_collected": 0,
-        "live_streams_found": 0,
-        "limitations": ["Demo collector does not call YouTube."],
-    }
-
-
-def validate_package(channel: dict[str, Any], videos: list[dict[str, Any]], activity: dict[str, Any]) -> dict[str, Any]:
-    ids = [video["video_id"] for video in videos]
-    return {
-        "status": "ready" if videos and len(ids) == len(set(ids)) else "failed",
-        "pagination_complete": True,
-        "quality_passed": bool(videos) and len(ids) == len(set(ids)),
-        "videos_retrieved": len(videos),
-        "duplicate_video_ids": len(ids) - len(set(ids)),
-        "limitations": activity.get("limitations", []),
-    }
-
-
-def run_video_seo_analysis(videos: list[dict[str, Any]]) -> dict[str, Any]:
-    long_titles = [video for video in videos if len(video["title"]) >= 35]
-    return {
-        "specialist": "video_seo",
-        "findings": [
-            {
-                "finding": "Review title consistency and keyword coverage.",
-                "evidence_video_ids": [video["video_id"] for video in long_titles],
-                "confidence": "medium",
-            }
-        ],
-    }
-
-
-def run_performance_analysis(videos: list[dict[str, Any]]) -> dict[str, Any]:
-    top_video = max(videos, key=lambda video: video["views"])
-    return {
-        "specialist": "performance",
-        "findings": [
-            {
-                "finding": "The highest-view video should be reviewed for repeatable topics and packaging.",
-                "top_video_id": top_video["video_id"],
-                "top_video_views": top_video["views"],
-                "confidence": "high",
-            }
-        ],
-    }
-
-
-def run_content_analysis(videos: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "specialist": "content_strategy",
-        "findings": [
-            {
-                "finding": "The channel currently mixes Shorts and long-form videos.",
-                "formats": sorted({video["format"] for video in videos}),
-                "confidence": "high",
-            }
-        ],
-    }
-
-
-def synthesize_report(channel: dict[str, Any], validation: dict[str, Any], results: list[dict[str, Any]]) -> str:
-    lines = [
-        f"# YouTube Channel Analysis: {channel['channel_name']}",
-        "",
-        f"- Channel URL: {channel['channel_url']}",
-        f"- Videos analyzed: {validation['videos_retrieved']}",
-        f"- Data quality passed: {validation['quality_passed']}",
-        "",
-        "## Specialist findings",
-    ]
-    for result in results:
-        lines.append(f"\n### {result['specialist'].replace('_', ' ').title()}")
-        for finding in result["findings"]:
-            lines.append(f"- {finding['finding']}")
-            lines.append(f"  - Confidence: {finding['confidence']}")
-    lines += ["", "## Limitations", "", "This demo uses mock data. Replace collectors and analysis functions before relying on results."]
-    return "\n".join(lines) + "\n"
-
-
-def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def write_json(path: Path, value: Any) -> None:
-    path.write_text(json.dumps(value, indent=2), encoding="utf-8")
-
-
-def run(channel_url: str, output_root: Path) -> Path:
-    channel = resolve_channel(channel_url)
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = output_root / re.sub(r"[^a-z0-9-]+", "-", channel["channel_name"].lower()).strip("-") / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    channel_data = collect_channel_data(channel)
-    videos = collect_video_data(channel)
-    activity = collect_activity_data(channel)
-    validation = validate_package(channel_data, videos, activity)
-
-    write_json(run_dir / "channel.json", channel_data)
-    write_json(run_dir / "videos.json", videos)
-    write_json(run_dir / "activity.json", activity)
-    write_json(run_dir / "quality_report.json", validation)
-
-    if not validation["quality_passed"]:
-        raise RuntimeError("Collection failed quality validation; analysis was not started.")
-
-    results = [
-        run_video_seo_analysis(videos),
-        run_performance_analysis(videos),
-        run_content_analysis(videos),
-    ]
-    for result in results:
-        write_json(run_dir / f"{result['specialist']}.json", result)
-
-    report = synthesize_report(channel_data, validation, results)
-    (run_dir / "final-report.md").write_text(report, encoding="utf-8")
-    write_json(run_dir / "manifest.json", {
-        "status": "complete",
-        "run_id": run_id,
-        "channel_url": channel_url,
-        "run_dir": str(run_dir),
-        "completed_at": utc_now(),
-    })
-    return run_dir
+def prepare_run(channel_input: str, output_root: Path, client: YouTubeClient,
+                profile_path: Path = DEFAULT_PROFILE,
+                inputs_path: Path = DEFAULT_CONFIG_PATH) -> tuple[Path, Path]:
+    """Collect data and create all normalized inputs and output placeholders."""
+    run_root, collected = collect_configured(channel_input, output_root, client, profile_path)
+    collection = json.loads((run_root / "normalized" / "collection.json").read_text(encoding="utf-8"))
+    prepare_skill_inputs(run_dir=run_root, channel_data=collection["channel"],
+                         recent_videos=collected["videos"], config_path=inputs_path,
+                         collected=collected)
+    prepare_skill_outputs(run_dir=run_root, config_path=inputs_path)
+    return run_root, write_run_manifest(run_root)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Collect and analyze one YouTube channel.")
-    parser.add_argument("channel_url", help="YouTube channel URL")
-    parser.add_argument("--output", default="runs", help="Output directory (default: runs)")
+    parser = argparse.ArgumentParser(description="Collect a YouTube channel and prepare its Codex skill handoff.")
+    parser.add_argument("channel", help="Channel URL, @handle, legacy URL, or channel ID")
+    parser.add_argument("--output", default="runs")
+    parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--collection-config", type=Path, default=DEFAULT_PROFILE)
+    parser.add_argument("--inputs-config", type=Path, default=DEFAULT_CONFIG_PATH)
     args = parser.parse_args()
-
+    load_dotenv()
+    api_key = os.environ.get("YOUTUBE_API_KEY", "")
+    if not api_key or api_key == "replace-me":
+        print("ERROR: Set YOUTUBE_API_KEY in .env or the environment.", file=sys.stderr)
+        return 2
     try:
-        run_dir = run(args.channel_url, Path(args.output))
-    except Exception as exc:
+        run_root, manifest_path = prepare_run(args.channel, Path(args.output),
+                                              YouTubeClient(api_key, args.timeout),
+                                              args.collection_config, args.inputs_config)
+    except (ValueError, YouTubeAPIError, OSError, KeyError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-
-    report_path = run_dir / "final-report.md"
-    print(f"Run complete: {run_dir}")
-    print(f"Report: {report_path}\n")
-    print(report_path.read_text(encoding="utf-8"))
+    print(f"Run root: {run_root.resolve()}")
+    print(f"Skill manifest: {manifest_path.resolve()}")
+    print("Status: ready for Codex skills")
     return 0
 
 
