@@ -1,7 +1,8 @@
 """Collect public channel metadata with YouTube Data API v3.
 
 Run: python -m src.collectors.youtube_data_api https://youtube.com/@GoogleDevelopers
-Set YOUTUBE_API_KEY in the environment or a local .env file.
+Set YOUTUBE_API_KEY in the environment or a local .env file. A .env file may
+also set YOUTUBE_API_KEY_FILE to a file containing only the key.
 """
 from __future__ import annotations
 import argparse, json, os, re, sys, time
@@ -36,12 +37,29 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 def load_dotenv(path: Path = Path(".env")) -> None:
-    if not path.exists(): return
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+    if path.exists():
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+    # Keep the secret outside this project when desired. Relative paths are
+    # resolved next to the .env file, and an existing environment key wins.
+    current_key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+    if not current_key or current_key == "replace-me":
+        key_file = os.environ.get("YOUTUBE_API_KEY_FILE", "").strip()
+        path_file = path.parent / "api-key-path.txt"
+        if not key_file and path_file.exists():
+            key_file = next((line.strip().strip("'\"") for line in path_file.read_text(encoding="utf-8-sig").splitlines()
+                             if line.strip() and not line.strip().startswith("#")), "")
+        if key_file:
+            key_path = Path(key_file).expanduser()
+            if not key_path.is_absolute():
+                key_path = path.parent / key_path
+            if key_path.exists():
+                loaded_key = key_path.read_text(encoding="utf-8-sig").strip()
+                if loaded_key:
+                    os.environ["YOUTUBE_API_KEY"] = loaded_key
 
 def parse_channel_reference(value: str) -> ChannelReference:
     value = value.strip()

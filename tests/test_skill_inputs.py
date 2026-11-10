@@ -32,6 +32,7 @@ class SkillInputsTests(unittest.TestCase):
         ]
         self.config = {
             "channel_categorization": {
+                "skill_input_file": "data-for-channel-categorization.json",
                 "channel_name": True,
                 "channel_description": True,
                 "total_videos": 50,
@@ -81,3 +82,4 @@ class SkillInputsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -10,14 +10,24 @@ from pathlib import Path
 from src.collectors.configured_collection import DEFAULT_PROFILE, collect_configured
 
 from src.analysis.quick_channel import analyze_quick_channel, render_quick_analysis
-from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, load_inputs_config, prepare_skill_inputs
+from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, load_inputs_config, prepare_skill_inputs, prepare_skill_outputs
 from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, write_json
 
 
 def analyze_collected_run(run_dir: Path) -> Path:
     collection_path = run_dir / "normalized" / "collection.json"
     collection = json.loads(collection_path.read_text(encoding="utf-8"))
+    output_dir = run_dir / "skill-outputs"
+    category_path = output_dir / "channel-categorization-output.md"
+    niche_path = output_dir / "channel-niche-search-output.md"
+    if not category_path.exists() or not category_path.read_text(encoding="utf-8").strip():
+        raise ValueError(f"Missing completed categorization skill output: {category_path}")
+    if not niche_path.exists() or not niche_path.read_text(encoding="utf-8").strip():
+        raise ValueError(f"Missing completed niche skill output: {niche_path}")
+
     analysis = analyze_quick_channel(collection)
+    analysis["channel_category"] = category_path.read_text(encoding="utf-8").strip()
+    analysis["channel_niches"] = [niche_path.read_text(encoding="utf-8").strip()]
     json_path = run_dir / "analysis" / "quick-channel-analysis.json"
     text_path = run_dir / "quick-channel-analysis.txt"
     write_json(json_path, analysis)
@@ -36,6 +46,7 @@ def run(channel_input: str, output_root: Path, client: YouTubeClient, profile_pa
 
     prepare_skill_inputs(run_dir=run_dir, channel_data=channel, recent_videos=collected["videos"],
                          config_path=inputs_path, collected=collected)
+    prepare_skill_outputs(run_dir=run_dir, config_path=inputs_path)
     return analyze_collected_run(run_dir)
 
 

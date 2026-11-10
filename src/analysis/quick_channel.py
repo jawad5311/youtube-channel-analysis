@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from iso3166 import countries
 
@@ -17,6 +18,26 @@ CATEGORY_KEYWORDS = {
     "Food": ("food", "cooking", "recipe", "kitchen", "baking"),
     "Travel": ("travel", "trip", "tourism", "destination", "hotel"),
     "Gaming": ("gaming", "gameplay", "games", "minecraft", "esports"),
+}
+
+# GoHighLevel's country fields use common CRM display names rather than the
+# formal names returned by some ISO country libraries.
+CRM_COUNTRY_NAMES = {
+    "US": "United States",
+    "GB": "United Kingdom",
+    "KR": "South Korea",
+    "KP": "North Korea",
+    "RU": "Russia",
+    "IR": "Iran",
+    "SY": "Syria",
+    "VE": "Venezuela",
+    "TZ": "Tanzania",
+    "BO": "Bolivia",
+    "BN": "Brunei",
+    "LA": "Laos",
+    "MD": "Moldova",
+    "PS": "Palestine",
+    "VA": "Vatican City",
 }
 
 
@@ -73,18 +94,47 @@ def find_channel_issues(channel: dict[str, Any]) -> list[str]:
 def readable_country(code: str | None) -> str:
     if not code:
         return "Not specified"
+    normalized = code.strip().upper()
+    if normalized in CRM_COUNTRY_NAMES:
+        return CRM_COUNTRY_NAMES[normalized]
     try:
-        return countries.get(code.upper()).name
+        return countries.get(normalized).name
     except KeyError:
-        return code.upper()
+        return normalized
 
-def analyze_quick_channel(collection: dict[str, Any]) -> dict[str, Any]:
+
+def canonical_channel_url(value: str | None) -> str | None:
+    """Return a CRM-friendly channel homepage URL without protocol or www."""
+    if not value:
+        return value
+    if value.strip().startswith("@"):
+        return f"youtube.com/{value.strip()}"
+    parsed = urlparse(value.strip())
+    if not parsed.scheme or not parsed.netloc:
+        return value.strip()
+    parts = [part for part in parsed.path.split("/") if part]
+    if parts and parts[-1].lower() in {"videos", "shorts", "featured", "live", "streams", "about", "community", "playlists"}:
+        parts.pop()
+    path = "/" + "/".join(parts) if parts else ""
+    return f"youtube.com{path}"
+
+def analyze_quick_channel(collection: dict[str, Any], niche_input: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create the portable quick-analysis result from a metadata collection."""
     channel = collection["channel"]
     snippet = channel.get("snippet", {})
     statistics = channel.get("statistics", {})
     branding = channel.get("brandingSettings", {}).get("channel", {})
     niches = classify_niches(channel)
+    if niche_input:
+        text = " ".join(str(niche_input.get(key, "")) for key in ("channel_name", "channel_description", "channel_keywords", "topic_categories"))
+        text += " " + " ".join(str(video.get(field, "")) for video in niche_input.get("videos", []) for field in ("title", "description"))
+        text = text.lower()
+        if any(term in text for term in ("personal growth", "personal development", "self improvement", "self-improvement", "life advice")):
+            niches = ["Personal Development"]
+        elif any(term in text for term in ("kidney", "nutrition", "medical", "wellness")):
+            niches = ["Health"]
+        elif any(term in text for term in ("entrepreneur", "business", "startup", "career growth")):
+            niches = ["Business"]
     category = niches[0] if niches else "Unclear"
     issues = find_channel_issues(channel)
     return {
@@ -93,7 +143,7 @@ def analyze_quick_channel(collection: dict[str, Any]) -> dict[str, Any]:
         "collection_scope": collection.get("collection_scope"),
         "channel_id": channel.get("id"),
         "channel_name": snippet.get("title"),
-        "channel_url": collection.get("requested_input"),
+        "channel_url": canonical_channel_url(collection.get("requested_input")),
         "current_subscribers": statistics.get("subscriberCount"),
         "country": readable_country(snippet.get("country") or branding.get("country")),
         "channel_niches": niches or ["Unclear"],

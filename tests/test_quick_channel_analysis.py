@@ -1,9 +1,18 @@
 import unittest
 
-from src.analysis.quick_channel import analyze_quick_channel, render_quick_analysis
+from src.analysis.quick_channel import analyze_quick_channel, canonical_channel_url, readable_country, render_quick_analysis
 
 
 class QuickChannelAnalysisTests(unittest.TestCase):
+    def test_country_names_use_crm_friendly_labels(self):
+        self.assertEqual(readable_country("US"), "United States")
+        self.assertEqual(readable_country("GB"), "United Kingdom")
+        self.assertEqual(readable_country("AU"), "Australia")
+
+    def test_channel_url_is_normalized_to_homepage(self):
+        self.assertEqual(canonical_channel_url("https://www.youtube.com/@kidneycoach/videos"),
+                         "youtube.com/@kidneycoach")
+
     def test_classifies_health_channel_and_finds_no_metadata_issue(self):
         analysis = analyze_quick_channel({
             "collection_scope": "channel_metadata",

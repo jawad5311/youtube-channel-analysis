@@ -115,7 +115,18 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
         raise YouTubeAPIError("Channel not found.")
     channel = response["items"][0]
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    run_dir = output_root / slug(channel.get("snippet", {}).get("title", channel["id"])) / run_id
+    # Keep run folders stable by channel handle/ID rather than display name.
+    folder_key = ref.filter_value.lstrip("@") if ref.filter_name == "forHandle" else channel["id"]
+    channel_dir = output_root / slug(folder_key)
+    channel_dir.mkdir(parents=True, exist_ok=True)
+    versions = []
+    for existing in channel_dir.iterdir():
+        if existing.is_dir():
+            match = re.match(r"^V(\d+)\s*-", existing.name, re.IGNORECASE)
+            if match:
+                versions.append(int(match.group(1)))
+    version = max(versions, default=0) + 1
+    run_dir = channel_dir / f"V{version} - {run_id}"
     write_json(run_dir / "raw/channel-response.json", response)
     videos, candidates, seen = [], [], set()
     token = None
