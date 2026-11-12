@@ -17,13 +17,13 @@ Check whether the visual treatment represents the channel's actual topic and pos
 
 Compare recent thumbnails with older thumbnails in file order. Identify whether branding has become more consistent, whether the channel changed its visual identity, whether the banner matches the current or older thumbnail style, and whether multiple unrelated design eras exist.
 
-Only report issues that appear repeatedly across the thumbnails. Ignore an issue that occurs in just one thumbnail unless it indicates a clear channel-wide style problem. Use concise lowercase issue descriptions such as `no proper branding`, `no consistency`, `inconsistent graphics`, `no stable pattern`, `small text size`, `low text contrast`, `too many words on thumbnails`, `poor subject visibility`, `background does not separate the subject`, `banner and thumbnails do not match`, `visuals do not match the channel topic`, or `multiple unrelated design eras`.
+Only report issues that appear repeatedly across the thumbnails. Ignore an issue that occurs in just one thumbnail unless it indicates a clear channel-wide style problem. Use concise lowercase issue descriptions of no more than three words, such as `weak branding`, `inconsistent style`, `inconsistent graphics`, `unstable layout`, `small text`, `low contrast`, `text overload`, `poor visibility`, `weak separation`, `banner mismatch`, `topic mismatch`, or `mixed design eras`.
 
 If one or more repeated issues are found, return exactly one lowercase line in this format:
 
-`thumbnails looks unprofessional, issue 1, issue 2, issue 3, issue 4`
+`thumbnails look unprofessional, issue 1, issue 2, issue 3`
 
-Start the line with exactly `thumbnails looks unprofessional`. Include only the common issues found in the images, in order of impact, and include no more than four issues. Do not add headings, explanations, counts, recommendations, or punctuation other than the commas separating issues.
+Start the line with exactly `thumbnails look unprofessional`. After that phrase, include only two or three common issues found in the images, in order of impact. Every issue must be no more than three words long. Do not add headings, explanations, counts, recommendations, or punctuation other than the commas separating issues.
 
 If no repeated thumbnail issues are found, return exactly:
 
