@@ -43,7 +43,7 @@ completed output path before continuing.
 5. Thumbnail analysis
 
    - Skill: skills/channel-issues/thumbnail-analysis-skill.md
-   - Input: <run-root>/normalized/channel-issues/data-for-thumbnail-analysis-skill.json
+   - Input folder: <run-root>/normalized/channel-issues/thumbnail-analysis/
    - Output: <run-root>/skill-outputs/channel-issues/thumbnail-analysis-skill-output.md
 
 6. Playlist analysis

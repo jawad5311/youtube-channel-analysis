@@ -70,10 +70,10 @@
       ]
     },
     "thumbnail-analysis-skill": {
-      "total_videos": 50,
+      "total_videos": 8,
+      "banner_image": true,
       "videos": [
         {
-          "title": true,
           "thumbnails": true
         }
       ]

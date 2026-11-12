@@ -10,7 +10,7 @@ from typing import Any
 
 from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, prepare_skill_inputs, prepare_skill_outputs
 from src.collectors.configured_collection import DEFAULT_PROFILE, collect_configured
-from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, write_json
+from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, normalize_channel_input, write_json
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SKILL_MANIFEST_PATH = PROJECT_ROOT / "config" / "skill-manifest.json"
@@ -51,7 +51,10 @@ def prepare_run(channel_input: str, output_root: Path, client: YouTubeClient,
                 profile_path: Path = DEFAULT_PROFILE,
                 inputs_path: Path = DEFAULT_CONFIG_PATH) -> tuple[Path, Path]:
     """Collect data and create all normalized inputs and output placeholders."""
-    run_root, collected = collect_configured(channel_input, output_root, client, profile_path)
+    inputs_config = json.loads(inputs_path.read_text(encoding="utf-8"))
+    thumbnail_limit = inputs_config.get("channel_issues", {}).get("thumbnail-analysis-skill", {}).get("total_videos")
+    normalized_input = normalize_channel_input(channel_input)
+    run_root, collected = collect_configured(normalized_input, output_root, client, profile_path, thumbnail_limit)
     collection = json.loads((run_root / "normalized" / "collection.json").read_text(encoding="utf-8"))
     prepare_skill_inputs(run_dir=run_root, channel_data=collection["channel"],
                          recent_videos=collected["videos"], config_path=inputs_path,

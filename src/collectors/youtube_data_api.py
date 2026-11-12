@@ -75,6 +75,26 @@ def parse_channel_reference(value: str) -> ChannelReference:
     if len(parts) >= 2 and parts[0] == "user": return ChannelReference("forUsername", parts[1])
     raise ValueError("Use /@handle, /channel/UC..., /user/name, a handle, or a channel ID.")
 
+
+def normalize_channel_input(value: str) -> str:
+    """Normalize a channel reference before passing it to the collectors."""
+    value = value.strip()
+    if value.startswith("@"):
+        return value
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    if (parsed.hostname or "").lower() not in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+        raise ValueError("Expected a youtube.com channel URL, @handle, or channel ID.")
+    parts = [part for part in parsed.path.split("/") if part]
+    if not parts:
+        raise ValueError("The URL does not identify a channel.")
+    if parts[0].startswith("@"):
+        return f"youtube.com/{parts[0]}"
+    if parts[0] == "channel" and len(parts) >= 2:
+        return f"youtube.com/channel/{parts[1]}"
+    if parts[0] == "user" and len(parts) >= 2:
+        return f"youtube.com/user/{parts[1]}"
+    raise ValueError("Use /@handle, /channel/UC..., /user/name, a handle, or a channel ID.")
+
 class YouTubeClient:
     def __init__(self, api_key: str, timeout: int = 30, retries: int = 3):
         if not api_key: raise ValueError("YOUTUBE_API_KEY is missing.")

@@ -1,64 +1,42 @@
 ---
 name: quick-channel-analysis
-description: Run a quick YouTube channel analysis directly from a channel URL, @handle, legacy username URL, or channel ID and return a concise client-ready result.
+description: Run the YouTube channel analysis workflow for one supplied channel reference.
 ---
 
-# Quick YouTube Channel Analysis Orchestrator
+# Quick Channel Analysis
 
-Use this skill as the direct entry point when the user provides one YouTube channel URL, `@handle`, legacy username URL, or channel ID. The supplied channel value is the workflow input.
+Run the workflow in this order:
 
-## Workflow
+1. Pass the supplied channel reference to `orchestrator.py`.
+2. Wait for the Python workflow to complete successfully.
+3. Wait for fetching to complete successfully. Confirm that the run manifest,
+   normalized inputs, banner, thumbnails, and every other required asset exist.
+   Treat the successful completion of `orchestrator.py` as the end of the
+   preparation phase and as the handoff point for the skill-execution phase.
+   Do not return a result at this checkpoint.
+4. Run channel categorization using:
+   - Input: `<run-root>/normalized/data-for-channel-categorization-skill.json`
+   - Skill: `skills/youtube-channel-categorization.md`
+   - Output: `<run-root>/skill-outputs/channel-categorization-output.md`
+5. Run channel niche analysis using:
+   - Input: `<run-root>/normalized/data-for-channel-niche-search-skill.json`
+   - Skill: `skills/find-channel-niches.md`
+   - Output: `<run-root>/skill-outputs/channel-niche-search-output.md`
+6. Run the channel-issues orchestrator using:
+   - Skill: `skills/channel-issues/channel-issues-orchestrator.md`
+   The channel-issues orchestrator manages the input paths, skill instruction
+   paths, and output paths for all channel-issues sub-skills.
+7. Wait for every configured skill to complete and write its output.
+8. Read the completed category, niche, and channel-issues outputs.
+9. Return the final quick channel analysis.
 
-1. Normalize the supplied channel input before collection. Accept a full YouTube URL, `youtube.com/@handle`, an `@handle`, a legacy username URL, or a channel ID. Remove tab paths such as `/videos`, `/shorts`, `/about`, `/featured`, `/live`, `/streams`, `/community`, and `/playlists` from URLs. Pass the normalized reference to the project's data-fetching workflow, while preserving the canonical display URL as `youtube.com/@handle` when a handle is available.
+Do not continue to the next step when the previous step fails or has missing required output.
+After step 3, begin a separate skill-execution phase using the returned
+`<run-root>`. The assistant must perform steps 4–9 after the Python command
+returns. Do not treat `Status: ready for Codex skills` as the final result and
+do not report completion while the skill outputs are empty.
 
-2. Request the channel metadata from the YouTube Data API through the project's shared collector:
-
-   ```powershell
-   python orchestrator.py <channel>
-   ```
-
-
-3. Wait for the complete API response and confirm that all requested channel data has been received before starting analysis. Do not analyze partial or incomplete data.
-
-4. Wait until the collector confirms completion and all configured normalized files exist. If collection fails or a required file is missing, stop and report the error.
-
-5. Run channel categorization first. Read the resolved run manifest at
-   `<run-root>/manifest.json`, select the entry named
-   `youtube-channel-categorization`, read its input file, and provide that
-   input to the instruction file specified by the manifest. Wait for the
-   subskill to finish, then read its output file. Verify only that the output
-   file exists and contains content before continuing.
-
-6. Run niche analysis in this order: 
-read all data from `runs/<channel>/<run-id>/normalized/data-for-channel-niche-search-skill.json`; 
-provide that data to the skill at `skills/find-channel-niches.md`; 
-wait for the skill to finish; 
-then save the skill's result to `runs/<channel>/<run-id>/skill-outputs/channel-niche-search-output.md`
-
-7. Run the `channel-issues-orchestrator` entry from the resolved manifest. Give
-   it the current run manifest and wait for it to run the configured issue
-   subskills, save their individual outputs, and save the completed combined
-   result to its configured output path.
-
-   The quick workflow must not calculate, interpret, or replace subskill
-   results. After the subskills finish, read the category and niche output
-   files from the manifest and place their contents directly in the matching
-   report fields.
-
-8. Read the first non-empty lines from the completed
-   `channel-issues-orchestrator-output.md` and place them directly in the
-   `channel issues` field. Keep the individual specialist outputs available
-   in the run folder for review.
-
-## Testing output mode
-
-During development and testing, display the completed result directly in the chat. Do not update Google Sheets, create spreadsheet rows, or perform external writes during this mode. Show the final quick-analysis fields in the required output format after the skill results have been validated.
-
-When the application is explicitly switched to production output mode, the same validated result may be written to the matching Google Sheets row by normalized channel URL or channel ID.
-
-## Required field mapping
-
-The quick workflow must produce these fields in this order:
+Return the final result in this order:
 
 ```text
 channel name:
@@ -74,67 +52,13 @@ current subscribers:
 <subscriber count>
 
 niche:
-<niche result from $find-channel-niches>
+<niche result>
 
 country:
-<full readable country name>
+<full country name>
 
 channel issues:
-<combined concise issue text>
+<channel issues result>
 ```
 
-Use the collected channel metadata as follows:
-
-- `channel name`: `snippet.title`.
-- `channel url`: the normalized canonical URL resolved from the input.
-- `channel category`: the exact one-label result from `youtube-channel-categorization`. Never infer this field from video topics or broad niche keywords.
-- `current subscribers`: `statistics.subscriberCount`, formatted as a readable number.
-- `niche`: the exact comma-separated result from `$find-channel-niches`.
-- `country`: convert `snippet.country` to the full readable country name. Do not return the two-letter country code.
-- `channel issues`: the saved performance and video SEO outputs.
-
-When running `$find-channel-niches`, provide the channel title, About description, channel keywords, topic IDs, topic categories, and any available representative video titles or descriptions. Follow that skill's exact comma-separated output rules and place the result directly in the `niche` field without adding a label or explanation.
-
-## Output
-
-Return exactly this compact format for a single channel:
-
-```text
-channel name:
-<channel name>
-
-channel url:
-<canonical channel URL>
-
-channel category:
-<broad content category>
-
-current subscribers:
-<subscriber count>
-
-niche:
-<niche result from $find-channel-niches>
-
-country:
-<full readable country name>
-
-channel issues:
-<combined concise issue text>
-```
-
-The `channel issues` value should include only actionable findings supported by the available evidence. If no metadata-level issue is found and no optional issue check has produced a finding, use:
-
-```text
-No channel issues were found.
-```
-
-Keep the quick result concise. Do not include detailed per-video findings, raw API payloads, audit recommendations, thumbnail analysis, PDF generation, or a full web report. Those belong to the full audit workflow.
-
-## Failure handling
-
-- If channel collection fails, return the collection error and do not fabricate an analysis.
-- If an optional issue check lacks its required evidence, omit that check from the combined result rather than guessing.
-- Preserve the successful channel fields when only an optional check fails.
-- When Google Sheets integration is enabled, match the row by normalized channel URL or channel ID, update the existing row, and report duplicate or missing matches without silently overwriting or creating a row.
-
-
+Do not replace completed skill outputs with Python fallbacks.

@@ -32,7 +32,7 @@ def _manifest_entries(manifest_path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, 
 
 def prepare_skill_outputs(run_dir: Path, config_path: Path = DEFAULT_CONFIG_PATH,
                           manifest_path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Path]:
-    """Create one output placeholder for every configured skill."""
+    """Create the output files that the Codex skills will populate."""
     config = load_inputs_config(config_path)
     output_dir = run_dir / "skill-outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -332,6 +332,9 @@ def prepare_skill_inputs(
     }
     normalized_dir = run_dir / "normalized"
     normalized_dir.mkdir(parents=True, exist_ok=True)
+    thumbnail_config = config.get("channel_issues", {}).get("thumbnail-analysis-skill")
+    if thumbnail_config:
+        (normalized_dir / "channel-issues" / "thumbnail-analysis").mkdir(parents=True, exist_ok=True)
     created_files: dict[str, Path] = {}
 
     prepared = []
@@ -345,6 +348,13 @@ def prepare_skill_inputs(
                     continue
                 if skill not in entries:
                     raise ValueError(f"Skill {skill} is missing from the manifest.")
+                if skill == "thumbnail-analysis-skill":
+                    asset_path = (run_dir / entries[skill]["input"]).resolve()
+                    if not str(asset_path).startswith(str(normalized_dir.resolve()) + "\\"):
+                        raise ValueError(f"Manifest input for {skill} must stay inside normalized/.")
+                    asset_path.mkdir(parents=True, exist_ok=True)
+                    prepared.append((skill, asset_path, None))
+                    continue
                 child_path = (run_dir / entries[skill]["input"]).resolve()
                 if not str(child_path).startswith(str(normalized_dir.resolve()) + "\\"):
                     raise ValueError(f"Manifest input for {skill} must stay inside normalized/.")
@@ -371,6 +381,9 @@ def prepare_skill_inputs(
                 raise ValueError(f"Manifest input for {skill_name} must stay inside normalized/.")
             prepared.append((key, input_path, build_skill_data(channel_data, recent_videos, selection, collected)))
     for key, path, data in prepared:
+        if key == "thumbnail-analysis-skill":
+            created_files[key] = path
+            continue
         if "shorts_gap" in data:
             serialized = json.dumps(data, indent=2)
             serialized = re.sub(

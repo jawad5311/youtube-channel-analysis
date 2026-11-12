@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.request import Request, urlopen
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +19,36 @@ CHANNEL_FIELDS = {"name": ("snippet", "title"), "description": ("snippet", "desc
                   "topic_categories": ("topicDetails", "topicCategories"),
                   "banner_image": ("brandingSettings", "image(bannerExternalUrl)")}
 VIDEO_FIELDS = {"title", "description", "tags", "publishedAt", "thumbnails", "liveBroadcastContent", "duration", "viewCount"}
+
+
+def _download_image(url: str | None, destination: Path) -> bool:
+    if not url:
+        return False
+    try:
+        request = Request(url, headers={"User-Agent": "youtube-channel-analysis/1.0"})
+        with urlopen(request, timeout=20) as response:
+            destination.write_bytes(response.read())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _download_thumbnail_assets(run_dir: Path, channel: dict, videos: list[dict], limit: int | None = None) -> dict:
+    asset_dir = run_dir / "normalized" / "channel-issues" / "thumbnail-analysis"
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    downloaded = {"banner": False, "videos": 0}
+    banner_url = channel.get("brandingSettings", {}).get("image", {}).get("bannerExternalUrl")
+    downloaded["banner"] = _download_image(banner_url, asset_dir / "banner.png")
+    ordered = sorted(videos, key=lambda item: item.get("snippet", {}).get("publishedAt", ""), reverse=True)
+    if limit is not None:
+        ordered = ordered[:limit]
+    for index, video in enumerate(ordered, start=1):
+        thumbnails = video.get("snippet", {}).get("thumbnails", {})
+        thumbnail = thumbnails.get("maxres") or thumbnails.get("standard") or thumbnails.get("high") or thumbnails.get("medium") or thumbnails.get("default")
+        url = thumbnail.get("url") if isinstance(thumbnail, dict) else None
+        if _download_image(url, asset_dir / f"video-{index}.png"):
+            downloaded["videos"] += 1
+    return downloaded
 
 
 def project_video(item, fields):
@@ -97,7 +128,7 @@ def load_profile(path: Path = DEFAULT_PROFILE) -> dict:
     return profile
 
 
-def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_PROFILE):
+def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_PROFILE, thumbnail_limit=None):
     profile = load_profile(profile_path)
     selected = [CHANNEL_FIELDS[key] for key, enabled in profile.get("channel", {}).items() if enabled]
     video_limit = profile.get("videos", {}).get("limit", 0)
@@ -306,6 +337,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
               "total_videos_retrieved": len(videos), "total_shorts_retrieved": len(candidates),
               "playlists": playlists, "playlist_status": playlist_status,
               "community_posts": community, "collection_metadata": metadata}
+    result["thumbnail_assets"] = _download_thumbnail_assets(run_dir, channel, videos, thumbnail_limit)
     write_json(run_dir / "normalized/collection.json", {"collection_scope": "configured_channel", "requested_input": channel_input, **result})
     write_json(run_dir / "normalized/recent-videos.json", {"total_videos_retrieved": len(videos), "videos": videos})
     write_json(run_dir / "normalized/shorts-candidates.json", {"total_shorts_retrieved": len(candidates), "videos": candidates,

@@ -5,9 +5,6 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-from iso3166 import countries
-
-
 CATEGORY_KEYWORDS = {
     "Health": ("health", "medical", "medicine", "disease", "wellness", "nutrition", "fitness", "kidney"),
     "Technology": ("technology", "software", "coding", "programming", "ai", "artificial intelligence"),
@@ -38,6 +35,13 @@ CRM_COUNTRY_NAMES = {
     "MD": "Moldova",
     "PS": "Palestine",
     "VA": "Vatican City",
+}
+
+COUNTRY_NAMES = {
+    "AU": "Australia", "CA": "Canada", "CN": "China", "DE": "Germany",
+    "ES": "Spain", "FR": "France", "IN": "India", "IT": "Italy",
+    "JP": "Japan", "MX": "Mexico", "NL": "Netherlands", "NZ": "New Zealand",
+    "PK": "Pakistan", "SG": "Singapore", "TR": "Turkey", "UA": "Ukraine",
 }
 
 
@@ -97,10 +101,7 @@ def readable_country(code: str | None) -> str:
     normalized = code.strip().upper()
     if normalized in CRM_COUNTRY_NAMES:
         return CRM_COUNTRY_NAMES[normalized]
-    try:
-        return countries.get(normalized).name
-    except KeyError:
-        return normalized
+    return COUNTRY_NAMES.get(normalized, normalized)
 
 
 def canonical_channel_url(value: str | None) -> str | None:

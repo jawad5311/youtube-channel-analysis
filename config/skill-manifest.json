@@ -65,7 +65,7 @@
       "name": "thumbnail-analysis-skill",
       "group": "channel-issues",
       "instructions": "skills/channel-issues/thumbnail-analysis-skill.md",
-      "input": "normalized/channel-issues/data-for-thumbnail-analysis-skill.json",
+      "input": "normalized/channel-issues/thumbnail-analysis",
       "output": "skill-outputs/channel-issues/thumbnail-analysis-skill-output.md",
       "required": false,
       "order": 7
