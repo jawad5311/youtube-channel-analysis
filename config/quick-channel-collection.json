@@ -34,7 +34,7 @@
   },
   "playlists": {
     "enabled": true,
-    "fields": ["title", "description", "itemCount"]
+    "fields": ["playlistId", "playlistUrl", "title", "description", "itemCount"]
   },
   "community_posts": {
     "enabled": true,

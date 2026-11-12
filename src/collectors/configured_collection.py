@@ -96,7 +96,7 @@ def load_profile(path: Path = DEFAULT_PROFILE) -> dict:
             raise ValueError(f"Invalid {section} settings.")
         if set(rule.get("fields", [])) - VIDEO_FIELDS:
             raise ValueError(f"Unsupported {section} fields.")
-    for section, allowed in (("playlists", {"title", "description", "itemCount"}),
+    for section, allowed in (("playlists", {"playlistId", "playlistUrl", "title", "description", "itemCount"}),
                              ("community_posts", {"text", "publishedAt", "pinned"})):
         rule = profile.get(section, {})
         keys = {"enabled", "fields", "limit"} | ({"source"} if section == "community_posts" else set())
@@ -285,7 +285,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     if rule.get("enabled"):
         playlist_status, token, page = "complete", None, 0
         pfields = rule.get("fields", [])
-        snippet = [f for f in pfields if f != "itemCount"]
+        snippet = [f for f in pfields if f not in {"playlistId", "playlistUrl", "itemCount"}]
         selectors = ["id", "status(privacyStatus)"]
         pparts = ["status"]
         if snippet:
@@ -302,8 +302,15 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
             write_json(run_dir / f"raw/playlists-{page:04}.json", response)
             for item in response.get("items", []):
                 if item.get("status", {}).get("privacyStatus") == "public":
-                    playlists.append({f: item.get("contentDetails" if f == "itemCount" else "snippet", {}).get(f)
-                                      for f in pfields})
+                    playlist = {}
+                    for field in pfields:
+                        if field == "playlistId":
+                            playlist[field] = item.get("id")
+                        elif field == "playlistUrl":
+                            playlist[field] = f"https://www.youtube.com/playlist?list={item.get('id')}"
+                        else:
+                            playlist[field] = item.get("contentDetails" if field == "itemCount" else "snippet", {}).get(field)
+                    playlists.append(playlist)
             next_token = response.get("nextPageToken")
             if not next_token:
                 break

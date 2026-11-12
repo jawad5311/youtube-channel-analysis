@@ -79,9 +79,16 @@
       ]
     },
     "analyze-playlists": {
+      "channel_name": true,
+      "channel_keywords": true,
+      "total_public_videos": true,
+      "total_long_videos": true,
+      "total_shorts": true,
       "total_playlists": 50,
       "playlists": [
         {
+          "playlistId": true,
+          "playlistUrl": true,
           "title": true,
           "description": true,
           "itemCount": true

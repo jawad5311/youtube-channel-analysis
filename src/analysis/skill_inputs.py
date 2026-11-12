@@ -245,7 +245,7 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
     if not isinstance(config, dict):
         raise ValueError("Skill configuration must be an object.")
     sections = {"videos", "shorts", "playlists", "community_posts"}
-    allowed = set(CHANNEL_PATHS) | sections | {"max_age_months", "high_view_outliers", "low_view_outliers", "total_videos", "total_shorts", "total_playlists", "total_community_posts", "collection_metadata"}
+    allowed = set(CHANNEL_PATHS) | sections | {"max_age_months", "high_view_outliers", "low_view_outliers", "total_videos", "total_shorts", "total_playlists", "total_community_posts", "total_public_videos", "total_long_videos", "collection_metadata"}
     if set(config) - allowed:
         raise ValueError(f"Unsupported skill-input fields: {sorted(set(config) - allowed)}")
     output, missing = {}, []
@@ -258,11 +258,17 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
                 missing.append(key)
             else:
                 output[key] = value
+    if config.get("total_public_videos"):
+        output["total_public_videos"] = collected.get("total_videos_retrieved", len(recent_videos))
+    if config.get("total_long_videos"):
+        output["total_long_videos"] = collected.get("total_videos_retrieved", len(recent_videos))
+    if config.get("total_shorts"):
+        output["total_shorts"] = collected.get("total_shorts_retrieved", len(collected.get("shorts_candidates", [])))
     community = collected.get("community_posts", {})
     sources = {
         "videos": (recent_videos, RECORD_PATHS),
         "shorts": (collected.get("shorts_candidates", []), RECORD_PATHS),
-        "playlists": (collected.get("playlists", []), {f: (f,) for f in ("title", "description", "itemCount")}),
+        "playlists": (collected.get("playlists", []), {f: (f,) for f in ("playlistId", "playlistUrl", "title", "description", "itemCount")}),
         "community_posts": (community.get("posts", []), {f: (f,) for f in ("text", "publishedAt", "pinned")}),
     }
     for section, (records, paths) in sources.items():
@@ -401,4 +407,3 @@ def prepare_skill_inputs(
         created_files[key] = path
 
     return created_files
-

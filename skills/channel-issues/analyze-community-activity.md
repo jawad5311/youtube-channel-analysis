@@ -31,7 +31,7 @@ A significant gap means 14 or more consecutive days with no posts, between posts
 
 1. Verified no visible channel posts: `no community tab activity`.
 2. Latest post at least one completed year ago: `no posting, last post x years ago`.
-3. Otherwise, latest post at least one completed month ago: `no posting, last post x months ago`.
+3. latest post x months ago: `no posting, last post x months ago`.
 4. If required browser evidence, dates, or coverage cannot be established: `insufficient data to evaluate community tab activity`.
 5. Significant gaps within the observed history: `irregular posting on community tab`.
 6. At least two posts in every evaluated complete week, with no significant gaps: `regular posting on community tab`.
@@ -44,12 +44,12 @@ The verdicts are the user's outreach assessment labels. Do not infer engagement,
 
 ## Output examples
 
+- Posts page inaccessible: `no activity in community`
 - Confirmed empty Posts feed: `no community tab activity`
-- Two or more posts every complete week: `regular posting on community tab`
-- Four recent posts, one each week, with no significant gaps: `4 community posts per month, needs improvement`
-- Five posts in one week followed by three empty weeks: `irregular posting on community tab`, unless the latest post meets the monthly inactivity rule
-- Latest post three months ago: `no posting, last post 3 months ago`
-- Latest post two years ago: `no posting, last post 2 years ago`
-- Posts page inaccessible: `insufficient data to evaluate community tab activity`
+- Latest post x years ago: `no posting on community, last post x years ago`
+- Latest post x months ago: `no posting on community, last post x months ago`
+- around one post each week, with no significant gaps: `x community posts per month, needs improvement`
+- more than 2 or 3 posts in one week followed by two or more empty weeks: `irregular posting on community tab`
+- Two or more posts every complete week: `no issue in community posting`
 
 Return only the applicable one-line verdict.

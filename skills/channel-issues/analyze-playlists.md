@@ -24,10 +24,10 @@ Ignore YouTube system playlists such as Uploads, Likes, and Favorites. Do not tr
 
 Apply these rules in order:
 
-- Verified zero public custom playlists -> `creating no playlists`
-- Public playlists exist but content is missing, scattered, duplicated, or not organized into meaningful groups -> `playlists are not organized`
-- Playlists exist and content is organized, but one or more meaningful playlists have weak, missing, or non-keyword-focused descriptions -> `playlists are not seo optimized`
-- Playlists exist, contain relevant organized content, and their titles and descriptions are detailed and keyword relevant -> `playlists are seo optimized`
+-  zero public custom playlists -> `creating no playlists`
+- Public playlists exist but content is missing, scattered, or not organized into meaningful groups -> `playlists are not organized`
+- Playlists exist and content is organized, but some playlists have weak, missing, or non-keyword-focused descriptions -> `playlists are not seo optimized`
+- Playlists exist, contain relevant organized content, and their titles and descriptions are detailed and keyword relevant -> `no issues in playlists`
 
 If both organization and SEO have problems, return `playlists are not organized` because organization is the more basic issue. Do not call a playlist SEO optimized because it has a keyword in its title alone.
 
@@ -48,9 +48,6 @@ playlists are not seo optimized
 ```
 
 ```text
-playlists are seo optimized
+no issues in playlists
 ```
 
-```text
-insufficient data to evaluate playlists
-```
