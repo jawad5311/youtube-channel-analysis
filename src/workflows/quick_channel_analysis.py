@@ -20,14 +20,18 @@ def analyze_collected_run(run_dir: Path) -> Path:
     output_dir = run_dir / "skill-outputs"
     category_path = output_dir / "channel-categorization-output.md"
     niche_path = output_dir / "channel-niche-search-output.md"
+    channel_issues_path = output_dir / "channel-issues" / "channel-issues-orchestrator-output.md"
     if not category_path.exists() or not category_path.read_text(encoding="utf-8").strip():
         raise ValueError(f"Missing completed categorization skill output: {category_path}")
     if not niche_path.exists() or not niche_path.read_text(encoding="utf-8").strip():
         raise ValueError(f"Missing completed niche skill output: {niche_path}")
+    if not channel_issues_path.exists() or not channel_issues_path.read_text(encoding="utf-8").strip():
+        raise ValueError(f"Missing completed channel issues orchestrator output: {channel_issues_path}")
 
     analysis = analyze_quick_channel(collection)
     analysis["channel_category"] = category_path.read_text(encoding="utf-8").strip()
     analysis["channel_niches"] = [niche_path.read_text(encoding="utf-8").strip()]
+    analysis["channel_issues"] = [line.strip() for line in channel_issues_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     json_path = run_dir / "analysis" / "quick-channel-analysis.json"
     text_path = run_dir / "quick-channel-analysis.txt"
     write_json(json_path, analysis)

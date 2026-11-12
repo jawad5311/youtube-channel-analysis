@@ -39,22 +39,32 @@
         }
       ]
     },
-    "check-video-seo-score": {
-      "total_videos": 50,
+    "video-seo-score": {
+      "total_videos": 12,
       "videos": [
         {
           "title": true,
           "description": true,
-          "tags": true
+          "tags": true,
+          "duration": true
+        }
+      ]
+    },
+    "video-description-quality": {
+      "total_videos": 12,
+      "videos": [
+        {
+          "title": true,
+          "description": true,
+          "tags": true,
+          "duration": true
         }
       ]
     },
     "analyze-shorts-activity": {
-      "total_shorts": 50,
+      "total_shorts": 30,
       "shorts": [
         {
-          "title": true,
-          "description": true,
           "publishedAt": true
         }
       ]
@@ -86,16 +96,6 @@
           "title": true,
           "description": true,
           "publishedAt": true
-        }
-      ]
-    },
-    "video-seo-analysis-skill": {
-      "total_videos": 50,
-      "videos": [
-        {
-          "title": true,
-          "description": true,
-          "tags": true
         }
       ]
     },

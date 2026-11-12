@@ -35,13 +35,22 @@
       "order": 3
     },
     {
-      "name": "check-video-seo-score",
+      "name": "video-seo-score",
       "group": "channel-issues",
-      "instructions": "skills/channel-issues/check-video-seo-score.md",
+      "instructions": "skills/channel-issues/video-seo-score.md",
       "input": "normalized/channel-issues/data-for-video-seo-score-skill.json",
-      "output": "skill-outputs/channel-issues/check-video-seo-score-output.md",
+      "output": "skill-outputs/channel-issues/video-seo-score-output.md",
       "required": false,
       "order": 4
+    },
+    {
+      "name": "video-description-quality",
+      "group": "channel-issues",
+      "instructions": "skills/channel-issues/video-description-quality.md",
+      "input": "normalized/channel-issues/data-for-video-description-quality-skill.json",
+      "output": "skill-outputs/channel-issues/video-description-quality-output.md",
+      "required": false,
+      "order": 5
     },
     {
       "name": "analyze-shorts-activity",
@@ -50,7 +59,7 @@
       "input": "normalized/channel-issues/data-for-shorts-activity-skill.json",
       "output": "skill-outputs/channel-issues/analyze-shorts-activity-output.md",
       "required": false,
-      "order": 5
+      "order": 6
     },
     {
       "name": "thumbnail-analysis-skill",
@@ -59,7 +68,7 @@
       "input": "normalized/channel-issues/data-for-thumbnail-analysis-skill.json",
       "output": "skill-outputs/channel-issues/thumbnail-analysis-skill-output.md",
       "required": false,
-      "order": 6
+      "order": 7
     },
     {
       "name": "analyze-playlists",
@@ -68,7 +77,7 @@
       "input": "normalized/channel-issues/data-for-playlist-analysis-skill.json",
       "output": "skill-outputs/channel-issues/analyze-playlists-output.md",
       "required": false,
-      "order": 7
+      "order": 8
     },
     {
       "name": "analyze-community-activity",
@@ -77,7 +86,7 @@
       "input": "normalized/channel-issues/data-for-community-activity-skill.json",
       "output": "skill-outputs/channel-issues/analyze-community-activity-output.md",
       "required": false,
-      "order": 8
+      "order": 9
     },
     {
       "name": "content-strategy-analysis-skill",
@@ -85,15 +94,6 @@
       "instructions": "skills/channel-issues/content-strategy-analysis-skill.md",
       "input": "normalized/channel-issues/data-for-content-strategy-analysis-skill.json",
       "output": "skill-outputs/channel-issues/content-strategy-analysis-skill-output.md",
-      "required": false,
-      "order": 9
-    },
-    {
-      "name": "video-seo-analysis-skill",
-      "group": "channel-issues",
-      "instructions": "skills/channel-issues/video-seo-analysis-skill.md",
-      "input": "normalized/channel-issues/data-for-video-seo-analysis-skill.json",
-      "output": "skill-outputs/channel-issues/video-seo-analysis-skill-output.md",
       "required": false,
       "order": 10
     },

@@ -89,22 +89,13 @@
       "order": 9
     },
     {
-      "name": "video-seo-analysis-skill",
-      "group": "channel-issues",
-      "instructions": "skills/channel-issues/video-seo-analysis-skill.md",
-      "input": "normalized/channel-issues/data-for-video-seo-analysis-skill.json",
-      "output": "skill-outputs/channel-issues/video-seo-analysis-skill-output.md",
-      "required": false,
-      "order": 10
-    },
-    {
       "name": "channel-issues-orchestrator",
       "group": "channel-issues",
       "instructions": "skills/channel-issues/channel-issues-orchestrator.md",
       "input": "normalized/channel-issues/data-for-channel-issues-skill.json",
       "output": "skill-outputs/channel-issues/channel-issues-orchestrator-output.md",
       "required": false,
-      "order": 11
+      "order": 10
     }
   ],
   "validation": {

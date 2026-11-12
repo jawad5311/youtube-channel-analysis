@@ -138,8 +138,67 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
         raise YouTubeAPIError("Uploads playlist missing from channel response.")
     fields = sorted(set(profile.get("videos", {}).get("fields", [])) |
                     set(profile.get("shorts", {}).get("fields", [])))
+    shorts_confirmed = False
+    if shorts_limit and channel.get("id", "").startswith("UC"):
+        shorts_playlist = "UUSH" + channel["id"][2:]
+        fallback_candidates = candidates
+        candidates = []
+        shorts_token = None
+        shorts_page = 0
+        shorts_seen = set()
+        try:
+            while len(candidates) < shorts_limit:
+                shorts_page += 1
+                listing = client.get(
+                    "playlistItems",
+                    part="contentDetails",
+                    playlistId=shorts_playlist,
+                    fields="items(contentDetails(videoId)),nextPageToken",
+                    maxResults=min(50, shorts_limit - len(candidates)),
+                    pageToken=shorts_token,
+                )
+                write_json(run_dir / f"raw/shorts-uploads-{shorts_page:04}.json", listing)
+                ids = [item["contentDetails"]["videoId"] for item in listing.get("items", [])]
+                ids = [vid for vid in dict.fromkeys(ids) if vid not in shorts_seen]
+                shorts_seen.update(ids)
+                if not ids:
+                    break
+                selector = "id,contentDetails(duration)"
+                snippet_fields = sorted((set(fields) - {"duration", "viewCount"}) | {"publishedAt"})
+                if snippet_fields:
+                    selector += ",snippet(" + ",".join(snippet_fields) + ")"
+                parts = "contentDetails,snippet"
+                if "viewCount" in fields:
+                    selector += ",statistics(viewCount)"
+                    parts += ",statistics"
+                details = client.get("videos", part=parts,
+                                     fields="items(" + selector + ")", id=",".join(ids))
+                write_json(run_dir / f"raw/shorts-videos-{shorts_page:04}.json", details)
+                by_id = {item["id"]: item for item in details.get("items", [])}
+                for vid in ids:
+                    item = by_id.get(vid)
+                    if item:
+                        duration_match = re.fullmatch(
+                            r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?",
+                            item.get("contentDetails", {}).get("duration", ""),
+                        )
+                        if not duration_match:
+                            continue
+                        hours, minutes, seconds = (float(value or 0) for value in duration_match.groups())
+                        duration = hours * 3600 + minutes * 60 + seconds
+                        if 0 < duration <= 180:
+                            candidates.append(project_video(item, profile.get("shorts", {}).get("fields", [])))
+                        if len(candidates) >= shorts_limit:
+                            break
+                shorts_token = listing.get("nextPageToken")
+                if not shorts_token:
+                    break
+            shorts_confirmed = bool(candidates)
+        except YouTubeAPIError:
+            shorts_confirmed = False
+            candidates = fallback_candidates[:shorts_limit]
     page = 0
-    while (len(videos) < video_limit or len(candidates) < shorts_limit) and scanned < cap:
+    while len(videos) < video_limit and scanned < cap:
         page += 1
         listing = client.get("playlistItems", part="contentDetails", playlistId=uploads,
                              fields="items(contentDetails(videoId)),nextPageToken",
@@ -180,9 +239,10 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                     unknown += 1
                     continue
                 section = "videos" if duration > 180 else "shorts"
-                target, limit = (videos, video_limit) if section == "videos" else (candidates, shorts_limit)
-                if len(target) < limit:
-                    target.append(project_video(item, profile.get(section, {}).get("fields", [])))
+                target = videos if section == "videos" else candidates
+                if section == "shorts" and shorts_confirmed:
+                    continue
+                target.append(project_video(item, profile.get(section, {}).get("fields", [])))
         token = listing.get("nextPageToken")
         if not token:
             exhausted = True
@@ -229,7 +289,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
             "community_posts": community_rule, "activity_coverage": coverage,
             "instruction": "Collect with a browser; pending does not mean zero posts. Save posts and observed coverage in normalized/community-posts.json.",
         })
-    metadata = {"shorts_confirmed": False, "uploads_scanned": scanned,
+    metadata = {"shorts_confirmed": shorts_confirmed, "uploads_scanned": scanned,
                 "uploads_exhausted": exhausted, "missing_videos": missing, "unknown_durations": unknown,
                 "scan_limit_reached": scanned >= cap,
                 "requested_counts": {"videos": video_limit, "shorts": shorts_limit},
@@ -243,17 +303,18 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     if coverage.get("record_collection_status"):
         metadata["status"] = "partial" if shorts_limit or missing or unknown or community_rule.get("enabled") or len(videos) < video_limit else "ready"
     result = {"channel": channel, "videos": videos, "shorts_candidates": candidates,
+              "total_videos_retrieved": len(videos), "total_shorts_retrieved": len(candidates),
               "playlists": playlists, "playlist_status": playlist_status,
               "community_posts": community, "collection_metadata": metadata}
     write_json(run_dir / "normalized/collection.json", {"collection_scope": "configured_channel", "requested_input": channel_input, **result})
-    write_json(run_dir / "normalized/recent-videos.json", {"videos": videos})
-    write_json(run_dir / "normalized/shorts-candidates.json", {"videos": candidates,
+    write_json(run_dir / "normalized/recent-videos.json", {"total_videos_retrieved": len(videos), "videos": videos})
+    write_json(run_dir / "normalized/shorts-candidates.json", {"total_shorts_retrieved": len(candidates), "videos": candidates,
                "classification": "Unconfirmed: duration at most 180 seconds; API does not expose Shorts status."})
     write_json(run_dir / "collection-profile.json", profile)
     write_json(run_dir / "normalized/playlists.json", {"status": playlist_status, "playlists": playlists})
     write_json(run_dir / "normalized/community-posts.json", community)
     write_json(run_dir / "manifest.json", {"status": "partial" if shorts_limit or len(videos) < video_limit or community_rule.get("enabled") or missing or unknown else "ready",
-               "videos_retrieved": len(videos), "shorts_candidates_retrieved": len(candidates),
+               "videos_retrieved": len(videos), "shorts_retrieved": len(candidates),
                "uploads_scanned": scanned, "uploads_exhausted": exhausted, "api_requests": client.request_count,
                "playlist_status": playlist_status, "community_status": community["status"],
                "missing_videos": missing, "unknown_durations": unknown,

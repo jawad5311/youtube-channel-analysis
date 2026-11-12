@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -14,7 +16,6 @@ SKILL_SECTIONS = {
     "channel_categorization": "categorization",
     "channel_niche_search": "niche_search",
     "channel_issues": "issues",
-    "video_seo_analysis": "video_seo",
 }
 
 
@@ -126,6 +127,56 @@ def _remove_view_outliers(records: list[dict[str, Any]], high_count: int, low_co
     return kept, excluded
 
 
+def _add_short_upload_gaps(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ordered = sorted(records, key=lambda item: item.get("publishedAt") or "", reverse=True)
+    analysis_date = datetime.now(timezone.utc).date()
+    previous = None
+    output = []
+    for record in ordered:
+        item = dict(record)
+        current = item.get("publishedAt")
+        gap_days = None
+        if current and previous is None:
+            try:
+                current_at = datetime.fromisoformat(current.replace("Z", "+00:00"))
+                gap_days = math.floor((analysis_date - current_at.date()).days + 0.5)
+            except (AttributeError, TypeError, ValueError):
+                gap_days = None
+        elif previous and current:
+            try:
+                current_at = datetime.fromisoformat(current.replace("Z", "+00:00"))
+                gap_days = math.floor((previous - current_at).total_seconds() / 86400 + 0.5)
+            except (AttributeError, TypeError, ValueError):
+                gap_days = None
+        if current:
+            try:
+                previous = datetime.fromisoformat(current.replace("Z", "+00:00"))
+            except (AttributeError, TypeError, ValueError):
+                previous = None
+        if current:
+            try:
+                item["publishedAt"] = current_at.strftime("%a - %d - %b - %y")
+            except UnboundLocalError:
+                pass
+        item["gap_days"] = gap_days
+        output.append(item)
+    return output
+
+
+def _format_elapsed_since(published_at: str) -> str:
+    published = datetime.fromisoformat(published_at.replace("Z", "+00:00")).date()
+    elapsed_days = (datetime.now(timezone.utc).date() - published).days
+    if elapsed_days >= 365:
+        value, unit = elapsed_days // 365, "year"
+    elif elapsed_days >= 30:
+        value, unit = elapsed_days // 30, "month"
+    elif elapsed_days >= 7:
+        value, unit = elapsed_days // 7, "week"
+    else:
+        value, unit = elapsed_days, "day"
+    return f"{value} {unit}{'' if value == 1 else 's'} ago"
+
+
 def build_performance_skill_data(channel_data, recent_videos, config, collected=None):
     """Prepare chronological video reach data for the performance skill."""
     collected = collected or {}
@@ -233,7 +284,18 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
         if config.get(count_key, 0) > len(records):
             missing.append(f"{section}: requested {config[count_key]}, available {len(records)}")
         if section == "shorts":
-            output["shorts_status"] = "unconfirmed_candidates"
+            original_latest = next((item.get("publishedAt") for item in output[section] if item.get("publishedAt")), None)
+            output[section] = _add_short_upload_gaps(output[section])
+            shorts = output.pop(section)
+            total_shorts = output.pop(count_key)
+            output = {
+                "total_shorts": total_shorts,
+                "analysis_date": datetime.now(timezone.utc).strftime("%a - %d - %b - %y"),
+                "first_short_published": _format_elapsed_since(original_latest) if original_latest else "unknown",
+                "shorts_gap": [item["gap_days"] for item in shorts],
+                "shorts": shorts,
+                **output,
+            }
         if section == "community_posts":
             output["community_status"] = community.get("status", "not_collected")
         if section == "playlists":
@@ -309,7 +371,20 @@ def prepare_skill_inputs(
                 raise ValueError(f"Manifest input for {skill_name} must stay inside normalized/.")
             prepared.append((key, input_path, build_skill_data(channel_data, recent_videos, selection, collected)))
     for key, path, data in prepared:
-        write_json(path, data)
+        if "shorts_gap" in data:
+            serialized = json.dumps(data, indent=2)
+            serialized = re.sub(
+                r'("shorts_gap": )\[\n\s*(.*?)\n\s*\]',
+                lambda match: match.group(1) + "[" + ", ".join(
+                    value.strip() for value in match.group(2).split(",") if value.strip()
+                ) + "]",
+                serialized,
+                flags=re.DOTALL,
+            )
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(serialized, encoding="utf-8")
+        else:
+            write_json(path, data)
         created_files[key] = path
 
     return created_files

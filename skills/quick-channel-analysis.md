@@ -14,7 +14,7 @@ Use this skill as the direct entry point when the user provides one YouTube chan
 2. Request the channel metadata from the YouTube Data API through the project's shared collector:
 
    ```powershell
-   python -m src.workflows.quick_channel_analysis <channel>
+   python orchestrator.py <channel>
    ```
 
 
@@ -35,28 +35,20 @@ provide that data to the skill at `skills/find-channel-niches.md`;
 wait for the skill to finish; 
 then save the skill's result to `runs/<channel>/<run-id>/skill-outputs/channel-niche-search-output.md`
 
-7. Process each configured skill independently. For every skill, read its
-   manifest entry and input file, provide that input to the instruction file
-   specified by the manifest, wait for completion, and read the configured
-   output file. Keep each output separate.
-
-   Each skill execution must write its result to the assigned output file before
-   the workflow reports completion. After writing, verify that the file exists
-   and contains non-empty content. An empty placeholder is an execution
-   failure and must be reported as such; do not display it as a completed
-   skill result.
+7. Run the `channel-issues-orchestrator` entry from the resolved manifest. Give
+   it the current run manifest and wait for it to run the configured issue
+   subskills, save their individual outputs, and save the completed combined
+   result to its configured output path.
 
    The quick workflow must not calculate, interpret, or replace subskill
    results. After the subskills finish, read the category and niche output
    files from the manifest and place their contents directly in the matching
    report fields.
 
-8. Do not combine skill outputs yet. Do not run the channel-issues synthesis step or create a final combined issues result until that workflow is explicitly enabled.
-
-   While performance analysis is the active channel-issues skill, place the
-   completed performance output directly in the `channel issues` field. Show
-   only the active performance output file link after the report. Do not show
-   category or niche file links unless the user asks for them.
+8. Read the first non-empty lines from the completed
+   `channel-issues-orchestrator-output.md` and place them directly in the
+   `channel issues` field. Keep the individual specialist outputs available
+   in the run folder for review.
 
 ## Testing output mode
 
@@ -99,7 +91,7 @@ Use the collected channel metadata as follows:
 - `current subscribers`: `statistics.subscriberCount`, formatted as a readable number.
 - `niche`: the exact comma-separated result from `$find-channel-niches`.
 - `country`: convert `snippet.country` to the full readable country name. Do not return the two-letter country code.
-- `channel issues`: combine only supported metadata and completed specialist findings into concise text.
+- `channel issues`: the saved performance and video SEO outputs.
 
 When running `$find-channel-niches`, provide the channel title, About description, channel keywords, topic IDs, topic categories, and any available representative video titles or descriptions. Follow that skill's exact comma-separated output rules and place the result directly in the `niche` field without adding a label or explanation.
 

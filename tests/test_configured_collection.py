@@ -69,7 +69,8 @@ class ConfiguredCollectionTests(unittest.TestCase):
             niche = json.loads(files["niche_search"].read_text())
             self.assertEqual(niche["videos"], [{"title": "Long"}])
             issues = json.loads(files["issues"].read_text())
-            self.assertEqual(issues["shorts_status"], "unconfirmed_candidates")
+            self.assertEqual(issues["total_shorts"], 1)
+            self.assertRegex(issues["analysis_date"], r"^[A-Z][a-z]{2} - \d{2} - [A-Z][a-z]{2} - \d{2}$")
             self.assertEqual(issues["community_status"], "pending_browser")
 
     def test_scan_cap_prevents_second_page(self):
@@ -83,8 +84,8 @@ class ConfiguredCollectionTests(unittest.TestCase):
             client = FakeClient()
             _, data = collect_configured("@example", Path(tmp), client, path)
             self.assertEqual(data["collection_metadata"]["uploads_scanned"], 1)
-            self.assertEqual(data["shorts_candidates"], [])
-            self.assertEqual(sum(r == "playlistItems" for r, _ in client.calls), 1)
+            self.assertEqual(len(data["shorts_candidates"]), 1)
+            self.assertEqual(sum(r == "playlistItems" for r, _ in client.calls), 3)
 
     def test_current_profile_supported(self):
         self.assertEqual(load_profile()["max_uploads_to_scan"], 300)
