@@ -58,17 +58,28 @@ completed output path before continuing.
    - Input: <run-root>/normalized/channel-issues/data-for-community-activity-skill.json
    - Output: <run-root>/skill-outputs/channel-issues/analyze-community-activity-output.md
 
-8. Content strategy analysis
-
-   - Skill: skills/channel-issues/content-strategy-analysis-skill.md
-   - Input: <run-root>/normalized/channel-issues/data-for-content-strategy-analysis-skill.json
-   - Output: <run-root>/skill-outputs/channel-issues/content-strategy-analysis-skill-output.md
-
-9. Combined output
+8. Combined output
 
    Run this step only after every required or eligible subskill has a verified
    non-empty output file. Read the first non-empty line from the completed
-   specialist output files and write those lines in workflow order to:
+   specialist output files in workflow order. Include a line only when it
+   reports an actual issue that needs attention.
+
+   Skip a subskill line when it reports any of the following:
+
+   - no issue
+   - no issues
+   - no issues in
+   - insufficient data
+   - data is insufficient
+
+   Treat case differences as equivalent when applying these skip rules. Keep
+   issue lines exactly as written by the subskill, preserve their workflow
+   order, and write only the retained issue lines to:
 
    <run-root>/skill-outputs/channel-issues/channel-issues-orchestrator-output.md
+
+   If every subskill reports no issue or insufficient data, write exactly:
+
+   `no channel issues found after analysis`
 

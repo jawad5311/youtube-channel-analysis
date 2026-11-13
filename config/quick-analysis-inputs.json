@@ -96,16 +96,6 @@
       ]
     },
     "analyze-community-activity": {},
-    "content-strategy-analysis-skill": {
-      "total_videos": 50,
-      "videos": [
-        {
-          "title": true,
-          "description": true,
-          "publishedAt": true
-        }
-      ]
-    },
     "channel-issues-orchestrator": {}
   }
 }

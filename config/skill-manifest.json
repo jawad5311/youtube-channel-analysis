@@ -89,15 +89,6 @@
       "order": 9
     },
     {
-      "name": "content-strategy-analysis-skill",
-      "group": "channel-issues",
-      "instructions": "skills/channel-issues/content-strategy-analysis-skill.md",
-      "input": "normalized/channel-issues/data-for-content-strategy-analysis-skill.json",
-      "output": "skill-outputs/channel-issues/content-strategy-analysis-skill-output.md",
-      "required": false,
-      "order": 10
-    },
-    {
       "name": "channel-issues-orchestrator",
       "group": "channel-issues",
       "instructions": "skills/channel-issues/channel-issues-orchestrator.md",
