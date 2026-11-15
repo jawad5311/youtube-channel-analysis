@@ -55,7 +55,7 @@ class ConfiguredCollectionTests(unittest.TestCase):
             self.assertNotIn("id", data["shorts_candidates"][0])
             self.assertNotIn("contentDetails", data["shorts_candidates"][0])
             self.assertEqual(data["playlists"][0]["itemCount"], 2)
-            self.assertEqual(data["community_posts"]["status"], "pending_browser")
+            self.assertIn(data["community_posts"]["status"], {"http_failed", "http_no_data", "http_no_posts"})
             self.assertTrue((run / "browser-collection-request.json").exists())
             video_request = next(params for resource, params in client.calls if resource == "videos")
             self.assertIn("statistics", video_request["part"])
@@ -71,7 +71,7 @@ class ConfiguredCollectionTests(unittest.TestCase):
             issues = json.loads(files["issues"].read_text())
             self.assertEqual(issues["total_shorts"], 1)
             self.assertRegex(issues["analysis_date"], r"^[A-Z][a-z]{2} - \d{2} - [A-Z][a-z]{2} - \d{2}$")
-            self.assertEqual(issues["community_status"], "pending_browser")
+            self.assertIn(issues["community_status"], {"http_failed", "http_no_data", "http_no_posts"})
 
     def test_scan_cap_prevents_second_page(self):
         with tempfile.TemporaryDirectory() as tmp:

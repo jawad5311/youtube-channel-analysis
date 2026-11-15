@@ -62,3 +62,17 @@ channel issues:
 ```
 
 Do not replace completed skill outputs with Python fallbacks.
+
+## Skill execution status
+
+During steps 4–7, report each configured skill immediately after execution with one status line:
+
+`skill status: <skill name> - executed successfully`
+
+or, when execution fails or required input or output is missing:
+
+`skill status: <skill name> - not executed successfully - <reason>`
+
+The status line must appear on screen. Do not write execution status into a specialist skill output file. Specialist output files must contain only that skill's analysis result. Do not mark a skill successful until its output file exists and is non-empty. For thumbnail analysis, inspect every image file in the supplied thumbnail input folder, including the banner when present. For community activity, use the completed HTTP `/posts` collection when available, and use the browser handoff only when HTTP collection fails. The final result may be returned only after all required skills have a status line.
+
+

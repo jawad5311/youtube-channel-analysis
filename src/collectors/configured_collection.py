@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,44 @@ CHANNEL_FIELDS = {"name": ("snippet", "title"), "description": ("snippet", "desc
                   "topic_categories": ("topicDetails", "topicCategories"),
                   "banner_image": ("brandingSettings", "image(bannerExternalUrl)")}
 VIDEO_FIELDS = {"title", "description", "tags", "publishedAt", "thumbnails", "liveBroadcastContent", "duration", "viewCount"}
+
+
+def _collect_posts_http(channel_id: str, limit: int) -> dict:
+    """Collect the initial public Posts page without scrolling."""
+    url = f"https://www.youtube.com/channel/{channel_id}/posts?hl=en"
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
+    with urlopen(request, timeout=30) as response:
+        html = response.read().decode("utf-8", "ignore")
+    match = re.search(r"var ytInitialData = (\{.*?\});", html)
+    if not match:
+        return {"status": "http_no_data", "posts": []}
+    data = json.loads(match.group(1))
+    posts, seen = [], set()
+
+    def text(value):
+        return "".join(item.get("text", "") for item in value.get("runs", []))
+
+    def walk(value):
+        if len(posts) >= limit:
+            return
+        if isinstance(value, dict):
+            renderer = value.get("backstagePostRenderer")
+            if renderer:
+                post_id = renderer.get("postId")
+                if post_id and post_id not in seen:
+                    seen.add(post_id)
+                    item = {"text": text(renderer.get("contentText", {})),
+                            "publishedAt": text(renderer.get("publishedTimeText", {})),
+                            "pinned": False, "postId": post_id}
+                    posts.append(item)
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(data)
+    return {"status": "complete" if posts else "http_no_posts", "posts": posts}
 
 
 def _download_image(url: str | None, destination: Path) -> bool:
@@ -135,6 +174,9 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     shorts_limit = profile.get("shorts", {}).get("limit", 0)
     parts = {part for part, _ in selected}
     selectors = channel_selection(selected)
+    if profile.get("playlists", {}).get("enabled"):
+        parts.add("statistics")
+        selectors.append("statistics(videoCount)")
     if video_limit or shorts_limit:
         parts.add("contentDetails")
         selectors.append("contentDetails(relatedPlaylists(uploads))")
@@ -159,11 +201,19 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     version = max(versions, default=0) + 1
     run_dir = channel_dir / f"V{version} - {run_id}"
     write_json(run_dir / "raw/channel-response.json", response)
+    community_rule = profile.get("community_posts", {})
+    post_executor = ThreadPoolExecutor(max_workers=1) if community_rule.get("enabled") else None
+    post_future = post_executor.submit(
+        _collect_posts_http, channel["id"], community_rule.get("limit", 0)
+    ) if post_executor else None
     videos, candidates, seen = [], [], set()
     token = None
     exhausted = False
     cap = profile.get("max_uploads_to_scan", 300)
+    if profile.get("playlists", {}).get("enabled"):
+        cap = max(cap, int(channel.get("statistics", {}).get("videoCount", 0) or 0))
     scanned, missing, unknown, dates = 0, 0, 0, []
+    long_videos_scanned, shorts_scanned = 0, 0
     uploads = channel.get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads")
     if (video_limit or shorts_limit) and not uploads:
         raise YouTubeAPIError("Uploads playlist missing from channel response.")
@@ -229,7 +279,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
             shorts_confirmed = False
             candidates = fallback_candidates[:shorts_limit]
     page = 0
-    while len(videos) < video_limit and scanned < cap:
+    while (video_limit or shorts_limit) and scanned < cap:
         page += 1
         listing = client.get("playlistItems", part="contentDetails", playlistId=uploads,
                              fields="items(contentDetails(videoId)),nextPageToken",
@@ -270,10 +320,16 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                     unknown += 1
                     continue
                 section = "videos" if duration > 180 else "shorts"
+                if section == "videos":
+                    long_videos_scanned += 1
+                else:
+                    shorts_scanned += 1
                 target = videos if section == "videos" else candidates
                 if section == "shorts" and shorts_confirmed:
                     continue
-                target.append(project_video(item, profile.get(section, {}).get("fields", [])))
+                section_limit = video_limit if section == "videos" else shorts_limit
+                if len(target) < section_limit:
+                    target.append(project_video(item, profile.get(section, {}).get("fields", [])))
         token = listing.get("nextPageToken")
         if not token:
             exhausted = True
@@ -318,16 +374,24 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                 playlist_status = "partial"
                 break
             token = next_token
-    community_rule = profile.get("community_posts", {})
-    community = {"status": "pending_browser" if community_rule.get("enabled") else "disabled", "posts": []}
+    if post_future:
+        try:
+            community = post_future.result()
+        except (OSError, ValueError, json.JSONDecodeError, TimeoutError) as exc:
+            community = {"status": "http_failed", "posts": [], "error": str(exc)}
+        post_executor.shutdown(wait=True)
+    else:
+        community = {"status": "disabled", "posts": []}
     coverage = profile.get("activity_coverage", {})
-    if community_rule.get("enabled"):
+    if community_rule.get("enabled") and community["status"] != "complete":
         write_json(run_dir / "browser-collection-request.json", {
             "channel_url": f"https://www.youtube.com/channel/{channel['id']}/posts",
             "community_posts": community_rule, "activity_coverage": coverage,
-            "instruction": "Collect with a browser; pending does not mean zero posts. Save posts and observed coverage in normalized/community-posts.json.",
+            "instruction": "HTTP collection did not produce posts. Collect with a browser and save posts in normalized/community-posts.json.",
         })
     metadata = {"shorts_confirmed": shorts_confirmed, "uploads_scanned": scanned,
+                "total_long_videos_scanned": long_videos_scanned,
+                "total_shorts_scanned": shorts_scanned,
                 "uploads_exhausted": exhausted, "missing_videos": missing, "unknown_durations": unknown,
                 "scan_limit_reached": scanned >= cap,
                 "requested_counts": {"videos": video_limit, "shorts": shorts_limit},
@@ -341,6 +405,9 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     if coverage.get("record_collection_status"):
         metadata["status"] = "partial" if shorts_limit or missing or unknown or community_rule.get("enabled") or len(videos) < video_limit else "ready"
     result = {"channel": channel, "videos": videos, "shorts_candidates": candidates,
+              "total_public_videos": channel.get("statistics", {}).get("videoCount", 0),
+              "total_long_videos": long_videos_scanned,
+              "total_shorts": shorts_scanned,
               "total_videos_retrieved": len(videos), "total_shorts_retrieved": len(candidates),
               "playlists": playlists, "playlist_status": playlist_status,
               "community_posts": community, "collection_metadata": metadata}

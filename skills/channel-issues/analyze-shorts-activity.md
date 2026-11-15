@@ -5,7 +5,7 @@ description: Evaluate Shorts publishing frequency, recency, and schedule regular
 
 # Analyze Shorts Activity
 
-Read `total_shorts`, `analysis_date`, `first_short_published`, the formatted `publishedAt` values, and the ordered `shorts_gap` array. Evaluate the conditions from top to bottom and stop at the first matching condition. Return only the matching lowercase output line.
+Read `total_shorts`, `analysis_date`, `latest_short_published`, the formatted `publishedAt` values, and the ordered `shorts_gap` array. Use `first_short_published` only as a legacy alias when `latest_short_published` is absent. Evaluate the conditions from top to bottom and stop at the first matching condition. Recency always takes precedence over posting frequency and schedule regularity. The first Shorts record and first `shorts_gap` value represent the most recent Short. Return only the matching lowercase output line.
 
 ## Condition order
 
@@ -53,4 +53,5 @@ For recency, compare the latest publication date with the analysis date and coun
 ## Output
 
 Return only one lowercase line. Do not include counts, explanations, headings, recommendations, or punctuation beyond the output text.
+
 

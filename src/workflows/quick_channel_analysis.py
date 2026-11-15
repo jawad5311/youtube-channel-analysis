@@ -12,6 +12,7 @@ from src.collectors.configured_collection import DEFAULT_PROFILE, collect_config
 from src.analysis.quick_channel import analyze_quick_channel, render_quick_analysis
 from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, load_inputs_config, prepare_skill_inputs, prepare_skill_outputs
 from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, normalize_channel_input, write_json
+from src.workflows.run_cleanup import clean_run_root
 
 
 def analyze_collected_run(run_dir: Path) -> Path:
@@ -47,6 +48,7 @@ def analyze_collected_run(run_dir: Path) -> Path:
 def run(channel_input: str, output_root: Path, client: YouTubeClient, profile_path: Path = DEFAULT_PROFILE,
         inputs_path: Path = DEFAULT_CONFIG_PATH) -> Path:
     """Collect channel data and recent videos, generate skill inputs, then run quick analysis."""
+    clean_run_root(output_root)
     inputs_config = load_inputs_config(inputs_path)
     thumbnail_limit = inputs_config.get("channel_issues", {}).get("thumbnail-analysis-skill", {}).get("total_videos")
     normalized_input = normalize_channel_input(channel_input)

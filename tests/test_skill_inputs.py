@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.analysis.skill_inputs import build_channel_categorization_data, prepare_skill_inputs
+from src.analysis.skill_inputs import build_channel_categorization_data, build_skill_data, prepare_skill_inputs
 
 
 class SkillInputsTests(unittest.TestCase):
@@ -77,6 +77,24 @@ class SkillInputsTests(unittest.TestCase):
             loaded = json.loads(cat_file.read_text(encoding="utf-8"))
             self.assertEqual(loaded["channel_name"], "Kidney Coach")
             self.assertEqual(len(loaded["videos"]), 2)
+
+    def test_shorts_recency_uses_newest_upload_when_input_is_unsorted(self):
+        config = {
+            "shorts": [{"publishedAt": True}],
+            "total_shorts": 10,
+        }
+        collected = {
+            "shorts_candidates": [
+                {"snippet": {"publishedAt": "2026-04-01T12:00:00Z"}},
+                {"snippet": {"publishedAt": "2026-11-10T12:00:00Z"}},
+            ],
+        }
+
+        data = build_skill_data(self.channel_data, [], config, collected)
+
+        self.assertEqual(data["shorts"][0]["publishedAt"], "Tue - 10 - Nov - 26")
+        self.assertGreaterEqual(data["shorts_gap"][0], 4)
+        self.assertEqual(data["latest_short_published"], data["first_short_published"])
 
 
 if __name__ == "__main__":

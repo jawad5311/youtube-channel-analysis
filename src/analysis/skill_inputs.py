@@ -259,11 +259,11 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
             else:
                 output[key] = value
     if config.get("total_public_videos"):
-        output["total_public_videos"] = collected.get("total_videos_retrieved", len(recent_videos))
+        output["total_public_videos"] = collected.get("total_public_videos", len(recent_videos))
     if config.get("total_long_videos"):
-        output["total_long_videos"] = collected.get("total_videos_retrieved", len(recent_videos))
+        output["total_long_videos"] = collected.get("total_long_videos", len(recent_videos))
     if config.get("total_shorts"):
-        output["total_shorts"] = collected.get("total_shorts_retrieved", len(collected.get("shorts_candidates", [])))
+        output["total_shorts"] = collected.get("total_shorts", len(collected.get("shorts_candidates", [])))
     community = collected.get("community_posts", {})
     sources = {
         "videos": (recent_videos, RECORD_PATHS),
@@ -290,13 +290,26 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
         if config.get(count_key, 0) > len(records):
             missing.append(f"{section}: requested {config[count_key]}, available {len(records)}")
         if section == "shorts":
-            original_latest = next((item.get("publishedAt") for item in output[section] if item.get("publishedAt")), None)
-            output[section] = _add_short_upload_gaps(output[section])
+            # Sort before deriving recency. Collector responses are not
+            # guaranteed to arrive newest-first, while the Shorts skill uses
+            # the latest upload to decide whether activity is current.
+            ordered_shorts = sorted(
+                output[section],
+                key=lambda item: item.get("publishedAt") or "",
+                reverse=True,
+            )
+            original_latest = next(
+                (item.get("publishedAt") for item in ordered_shorts if item.get("publishedAt")),
+                None,
+            )
+            output[section] = _add_short_upload_gaps(ordered_shorts)
             shorts = output.pop(section)
             total_shorts = output.pop(count_key)
             output = {
                 "total_shorts": total_shorts,
                 "analysis_date": datetime.now(timezone.utc).strftime("%a - %d - %b - %y"),
+                "latest_short_published": _format_elapsed_since(original_latest) if original_latest else "unknown",
+                # Keep the legacy key for existing skill packages.
                 "first_short_published": _format_elapsed_since(original_latest) if original_latest else "unknown",
                 "shorts_gap": [item["gap_days"] for item in shorts],
                 "shorts": shorts,
