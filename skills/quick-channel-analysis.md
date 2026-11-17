@@ -74,7 +74,7 @@ niche:
 <niche result>
 
 country:
-<full country name>
+<full country name, except use UK for the United Kingdom>
 
 channel issues:
 <channel issues result>

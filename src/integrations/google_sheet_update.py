@@ -24,7 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNS_ROOT = PROJECT_ROOT / "runs"
 COUNTRIES = {
     "AU": "Australia", "CA": "Canada", "DK": "Denmark", "DE": "Germany",
-    "IN": "India", "NZ": "New Zealand", "PK": "Pakistan", "GB": "United Kingdom",
+    "IN": "India", "NZ": "New Zealand", "PK": "Pakistan", "GB": "UK",
+    "United Kingdom": "UK",
     "US": "United States",
 }
 ANALYSIS_OUTPUTS = {

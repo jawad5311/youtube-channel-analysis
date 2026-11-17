@@ -21,7 +21,8 @@ CATEGORY_KEYWORDS = {
 # formal names returned by some ISO country libraries.
 CRM_COUNTRY_NAMES = {
     "US": "United States",
-    "GB": "United Kingdom",
+    "GB": "UK",
+    "UNITED KINGDOM": "UK",
     "KR": "South Korea",
     "KP": "North Korea",
     "RU": "Russia",

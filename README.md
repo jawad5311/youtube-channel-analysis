@@ -25,7 +25,7 @@ file. Put one path on one line. The workflow reads this file automatically
 when no API key is already set.
 
 Country output uses common CRM-friendly names for GoHighLevel, including
-`United States`, `United Kingdom`, `South Korea`, and `Russia`.
+`United States`, `UK`, `South Korea`, and `Russia`.
 
 The `.env` file and generated run data are excluded from Git.
 
