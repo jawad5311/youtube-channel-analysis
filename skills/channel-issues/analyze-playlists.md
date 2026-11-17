@@ -26,13 +26,13 @@ Ignore YouTube system playlists such as Uploads, Likes, and Favorites. Do not tr
 Apply these checks in order and retain every issue that applies:
 
 - zero public custom playlists -> `creating no playlists`
-- the sum of playlist `itemCount` values is lower than `total_public_videos` -> `not organizing content in playlists`
+- the sum of playlist `itemCount` values is lower than `total_public_videos` -> `not organizing all content in playlists`
 - one or more playlists lack a detailed, keyword-relevant description -> `playlists are not seo optimized`
 - public playlists exist, their item-count coverage reaches total public videos, and every playlist has a detailed keyword-relevant description -> `no issues in playlists`
 
 When both organization and SEO issues apply, return exactly:
 
-`not organizing content in playlists, playlists are not seo optimized`
+`not organizing all content in playlists, playlists are not seo optimized`
 
 When only one issue applies, return that single label. A larger playlist item sum can result from videos appearing in multiple playlists and does not prove unique coverage, but it does not trigger the organization issue under this rule.
 
@@ -45,7 +45,7 @@ creating no playlists
 ```
 
 ```text
-not organizing content in playlists
+not organizing all content in playlists
 ```
 
 ```text
@@ -53,7 +53,7 @@ playlists are not seo optimized
 ```
 
 ```text
-not organizing content in playlists, playlists are not seo optimized
+not organizing all content in playlists, playlists are not seo optimized
 ```
 
 ```text
