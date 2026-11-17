@@ -1,5 +1,8 @@
 # Secrets and local environment files
 .env
+config/google-oauth-client.json
+config/google-sheets-token.json
+config/google-sheet-columns-cache.json
 .env.*
 !.env.example
 api-key-path.txt

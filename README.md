@@ -73,3 +73,30 @@ python -m unittest discover -s tests -p "test_*.py"
 ```
 
 The tests use fake clients and do not make YouTube API requests.
+
+## Connect Google Sheets
+
+Create an OAuth client of type Desktop app in Google Cloud Console and save the downloaded JSON credentials as config/google-oauth-client.json. Install the dependencies, then start the local authorization flow with:
+
+    python -m src.integrations.google_sheets_auth
+
+The browser authorization flow saves a refreshable token to
+`config/google-sheets-token.json`. Both files are ignored by Git.
+
+### Refresh Google Sheet columns
+
+The Sheets updater refreshes `config/google-sheet-columns.txt` on the first
+update run after the 24-hour cooldown expires. It uses row 1 from its existing
+sheet read, so the refresh adds no API request. Column positions for writes
+come from that same live header row.
+
+To run the column reader independently, use:
+
+```powershell
+python -m src.integrations.google_sheet_columns
+```
+
+The command uses `config/google-sheet-url.txt` and the cached tab name. Pass
+`--sheet-name "Sheet1"` to select a tab or initialize a cache for a new
+spreadsheet. Add `--force` to fetch row 1 immediately. A successful fetch
+restarts the cooldown, even if the headers are identical.
