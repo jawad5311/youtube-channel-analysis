@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 from datetime import datetime, timezone
@@ -193,6 +194,11 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     # Handles are already constrained to a single URL path segment. Preserve
     # their spelling so the run folder matches the supplied channel handle.
     channel_dir = output_root / (folder_key if ref.filter_name == "forHandle" else slug(folder_key))
+    root = output_root.expanduser().resolve()
+    if channel_dir.is_symlink() or channel_dir.resolve().parent != root:
+        raise ValueError("Invalid channel run folder.")
+    if channel_dir.exists():
+        shutil.rmtree(channel_dir)
     channel_dir.mkdir(parents=True, exist_ok=True)
     versions = []
     for existing in channel_dir.iterdir():

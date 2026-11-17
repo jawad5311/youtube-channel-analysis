@@ -11,7 +11,6 @@ from typing import Any
 from src.analysis.skill_inputs import DEFAULT_CONFIG_PATH, prepare_skill_inputs, prepare_skill_outputs
 from src.collectors.configured_collection import DEFAULT_PROFILE, collect_configured
 from src.collectors.youtube_data_api import YouTubeAPIError, YouTubeClient, load_dotenv, normalize_channel_input, write_json
-from src.workflows.run_cleanup import clean_run_root
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SKILL_MANIFEST_PATH = PROJECT_ROOT / "config" / "skill-manifest.json"
@@ -52,7 +51,6 @@ def prepare_run(channel_input: str, output_root: Path, client: YouTubeClient,
                 profile_path: Path = DEFAULT_PROFILE,
                 inputs_path: Path = DEFAULT_CONFIG_PATH) -> tuple[Path, Path]:
     """Collect data and create all normalized inputs and output placeholders."""
-    clean_run_root(output_root)
     inputs_config = json.loads(inputs_path.read_text(encoding="utf-8"))
     thumbnail_limit = inputs_config.get("channel_issues", {}).get("thumbnail-analysis-skill", {}).get("total_videos")
     normalized_input = normalize_channel_input(channel_input)

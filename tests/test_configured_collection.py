@@ -36,6 +36,24 @@ class FakeClient:
 
 
 class ConfiguredCollectionTests(unittest.TestCase):
+    def test_replaces_only_the_selected_channel_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            profile = self.profile()
+            profile["community_posts"]["enabled"] = False
+            config = root / "profile.json"
+            config.write_text(json.dumps(profile), encoding="utf-8")
+            target = root / "example"
+            other = root / "other"
+            target.mkdir()
+            other.mkdir()
+            (target / "old.txt").write_text("old", encoding="utf-8")
+            (other / "keep.txt").write_text("keep", encoding="utf-8")
+            run, _ = collect_configured("@example", root, FakeClient(), config)
+            self.assertTrue(run.is_dir())
+            self.assertFalse((target / "old.txt").exists())
+            self.assertEqual((other / "keep.txt").read_text(encoding="utf-8"), "keep")
+
     def profile(self):
         return {"channel": {"name": True, "description": True},
                 "videos": {"limit": 1, "fields": ["title", "duration", "viewCount"]},
