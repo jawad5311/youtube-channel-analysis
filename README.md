@@ -85,6 +85,10 @@ The browser authorization flow saves a refreshable token to
 
 ### Refresh Google Sheet columns
 
+Copy `config/google-sheet-url.example.txt` to `config/google-sheet-url.txt`
+and paste your Google Sheet URL into the new file. Your URL file is local and
+is not committed to Git.
+
 The Sheets updater refreshes `config/google-sheet-columns.txt` on the first
 update run after the 24-hour cooldown expires. It uses row 1 from its existing
 sheet read, so the refresh adds no API request. Column positions for writes

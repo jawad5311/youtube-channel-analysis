@@ -3,6 +3,7 @@
 config/google-oauth-client.json
 config/google-sheets-token.json
 config/google-sheet-columns-cache.json
+config/google-sheet-url.txt
 .env.*
 !.env.example
 api-key-path.txt
