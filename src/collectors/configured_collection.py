@@ -190,7 +190,9 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     # Keep run folders stable by channel handle/ID rather than display name.
     folder_key = ref.filter_value.lstrip("@") if ref.filter_name == "forHandle" else channel["id"]
-    channel_dir = output_root / slug(folder_key)
+    # Handles are already constrained to a single URL path segment. Preserve
+    # their spelling so the run folder matches the supplied channel handle.
+    channel_dir = output_root / (folder_key if ref.filter_name == "forHandle" else slug(folder_key))
     channel_dir.mkdir(parents=True, exist_ok=True)
     versions = []
     for existing in channel_dir.iterdir():

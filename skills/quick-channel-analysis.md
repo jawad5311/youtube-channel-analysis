@@ -28,11 +28,30 @@ Run the workflow in this order:
    paths, and output paths for all channel-issues sub-skills.
 7. Wait for every configured skill to complete and write its output.
 8. Read the completed category, niche, and channel-issues outputs.
-9. Return the final quick channel analysis.
+9. Export the completed analysis to the configured Google Sheet before returning
+   the final result. From the project root, run the following with the working
+   Python interpreter, substituting the exact run root returned in step 3 and
+   the canonical channel URL. Use the spreadsheet configured in
+   `config/google-sheet-url.txt`.
+
+   ```powershell
+   python -m src.integrations.google_sheet_update --run-dir "<run-root>" --channel-url "<canonical-channel-url>"
+   ```
+
+   Wait for the command and report how many matching rows it updated. A result
+   of zero means the channel has no matching row. If export fails, report the
+   error and include the completed local analysis. Verify the command's exit
+   code and `<run-root>/sheet-export-status.json`: `updated` with a positive
+   row count confirms export, `no_matching_rows` means nothing was updated,
+   and `failed` or a missing receipt means export is not confirmed. If network
+   access is blocked, retry with the available network permission mechanism.
+   Never describe collection or specialist analysis alone as a completed sheet
+   update. Do not stop or ask to continue at the collection or analysis handoff.
+10. Return the final quick channel analysis and the Google Sheets update status.
 
 Do not continue to the next step when the previous step fails or has missing required output.
 After step 3, begin a separate skill-execution phase using the returned
-`<run-root>`. The assistant must perform steps 4–9 after the Python command
+`<run-root>`. The assistant must perform steps 4–10 after the Python command
 returns. Do not treat `Status: ready for Codex skills` as the final result and
 do not report completion while the skill outputs are empty.
 

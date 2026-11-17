@@ -28,10 +28,10 @@ keywords, topic categories, and video titles and descriptions.
 
 ## Objective
 
-Return up to three comma-separated niche values that best represent the
+Aim to return two or three comma-separated niche values that best represent the
 channel's recurring content. The first value must be the primary broad niche.
-Add one sub-niche only when it is strongly supported by the complete channel
-data.
+Select additional niches only when supported by recurring content. Return one
+when the evidence supports only one, and never invent a niche to reach two.
 
 The result must be accurate, concise, and ready to copy and paste.
 
@@ -40,18 +40,17 @@ The result must be accurate, concise, and ready to copy and paste.
 Silently follow these steps:
 
 1. Review every provided channel-level and video-level field before deciding.
-2. Give the strongest weight to `topic_categories`, but never use them as the
-   final answer alone.
+2. Use `topic_categories` as supporting signals. Give greatest weight to the
+   channel description and recurring subject matter across the collected videos.
 3. Map repeated language in the channel name, About description, and channel
    keywords to broad subject areas.
 4. Check that each candidate is supported by multiple representative video
    titles and descriptions when video data is available.
 5. Determine the primary content focus and any secondary focus that appears
    often enough to represent the channel.
-6. Resolve conflicts by requiring alignment between topic categories and the
-   channel description, keywords, and recurring video evidence. A single term
-   such as `mental health` must not override a channel consistently focused on
-   personal development, relationships, or another broader subject.
+6. Resolve conflicts using the channel description and recurring video evidence.
+   Broad platform categories do not need to match every selected niche. Do not
+   infer a clinical or therapeutic niche from personal experiences alone.
 7. Map each supported focus to the broadest accurate niche.
 8. Remove overlapping, repeated, narrow, or weakly supported niches.
 9. If evidence conflicts or does not support a reliable niche, return `Unclear`
@@ -63,12 +62,13 @@ Do not show this analysis to the user.
 ## Niche Selection Rules
 
 - Return a maximum of three niches.
-- Do not force three niches.
+- Aim for at least two niches when the evidence supports them.
+- Do not force a second or third niche when evidence is insufficient.
 - If only one niche clearly fits, return one.
 - If two niches clearly fit, return two.
 - Add a third niche only when it is strongly supported by recurring channel content.
-- Add a sub-niche only when it is strongly supported by recurring channel data;
-  never force a sub-niche.
+- Add a sub-niche only when its connection to the channel is unambiguous and
+  strongly supported by recurring channel data; never force a sub-niche.
 - Keep every niche and sub-niche to no more than two words.
 - Do not use hyphens or compound forms joined with `-` in the final output.
   For example, do not output `one-two`, `long-term`, or `plant-based`.
@@ -85,8 +85,15 @@ Do not show this analysis to the user.
 
 ## Broad Niche Rule
 
-Choose broad parent niches first. An optional second value may be a specific
-sub-niche when it adds useful, strongly supported detail.
+Choose a broad, accurate primary niche first, preferring one word when it is
+accurate. Aim to include a second and, where supported, a third recurring niche.
+A clearly established sub-niche may follow the broad primary niche when it adds
+useful detail. Do not infer certainty from isolated videos or vague labels.
+
+For example, recurring personal conversations about bereavement can support
+`Grief`. Select `Health` when healthcare, treatment, mental health, or
+wellness is a substantial recurring focus. A single episode mentioning therapy
+or physical health does not establish that focus.
 
 Examples:
 
@@ -156,7 +163,7 @@ Do not include:
 - A niche based only on the creator's job title
 - A niche based only on the creator's company
 - A niche based only on an audience type
-- A niche that merely overlaps with another selected niche
+- A redundant niche that adds no useful detail to another selected niche
 - A niche that describes the content format instead of the subject
 
 ## Do Not Use Content Formats as Niches
@@ -177,7 +184,8 @@ Only use one of these terms if the channel is specifically teaching or discussin
 
 ## Avoid Redundant Niches
 
-Do not select two niches when one is simply a narrower version of the other.
+An unambiguously supported sub-niche may accompany its broad parent when it
+adds useful specificity. Avoid overlapping labels that repeat the same meaning.
 
 Examples:
 
@@ -221,8 +229,8 @@ technology, EDUCATION, business
 ## Exact Output Format
 
 Return only the niche values separated by a comma and one space on one line.
-Return no more than three values total. The primary broad niche comes first;
-an optional sub-niche follows it only when strongly supported.
+Return no more than three values total. The primary niche comes first; add
+secondary niches only when strongly supported and distinct.
 
 Examples:
 
@@ -261,7 +269,7 @@ Before responding, silently confirm:
 - Each niche is one word whenever possible.
 - No value contains more than two words.
 - No format label is being used as a niche.
-- No niches overlap unnecessarily.
+- A sub-niche adds meaningful detail and is established by recurring evidence.
 - The output contains no more than three niches.
 - A sub-niche has not been added merely to fill space.
 - The response follows the exact comma-separated format.

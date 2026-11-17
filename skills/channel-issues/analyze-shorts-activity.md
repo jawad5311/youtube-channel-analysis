@@ -22,7 +22,7 @@ Read `total_shorts`, `analysis_date`, `latest_short_published`, the formatted `p
 
    Replace x with the completed whole number of months. Use months for the wording even when x is greater than one.
 
-4. Evaluate all upload gaps and weekly activity. Treat the schedule as irregular when the gaps show a break of more than 7 days, or repeated gaps of 5 or more days that make the weekly schedule inconsistent. If the schedule is irregular across the observed Shorts, return:
+4. Evaluate all upload gaps, current-month activity, and weekly activity. Treat the schedule as irregular when the gaps show a break of more than 7 days, or repeated gaps of 5 or more days that make the weekly schedule inconsistent. Also treat a channel as irregular when it was active in the earlier observed history but has published only one or two Shorts during the current calendar month or the most recent 30-day period. In that case, return:
    irregular shorts posting - no content calendar
 
 5. If the channel posts about one Short per week and the posting days are regular, return:

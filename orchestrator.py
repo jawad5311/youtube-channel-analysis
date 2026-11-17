@@ -88,6 +88,7 @@ def main() -> int:
     print(f"Run root: {run_root.resolve()}")
     print(f"Skill manifest: {manifest_path.resolve()}")
     print("Status: ready for Codex skills")
+    print("Analysis and Google Sheet export are still pending; complete the skill workflow before reporting completion.")
     return 0
 
 
