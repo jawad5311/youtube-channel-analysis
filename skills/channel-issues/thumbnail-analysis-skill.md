@@ -9,6 +9,10 @@ Read every image in the supplied input folder. The folder contains `banner.png` 
 
 Use `banner.png` as the channel branding reference. Compare the thumbnails with the banner for visual matching, including the main and accent colors, typography, logos or symbols, graphic treatments, shapes, patterns, imagery, and overall visual mood.
 
+If the channel has no banner, include `no channel banner` in the output. Check the channel's collected metadata or its public channel page when `banner.png` is missing. A failed download alone does not establish that the channel has no banner. If banner availability cannot be verified, do not claim it is missing.
+
+If no video thumbnails were collected, return `no channel banner` when the absence of a banner is confirmed. Otherwise return `insufficient data to evaluate thumbnails`.
+
 Compare the thumbnails with one another for repeated typography, consistent graphics, a stable layout or composition pattern, recognizable logos or symbols, consistent visual hierarchy, and a coherent color palette. Check whether the thumbnails feel like one channel while still distinguishing individual videos.
 
 Evaluate readability in every thumbnail. Check text size, text contrast, number of words, subject visibility, separation between the subject and background, clutter, and readability at mobile thumbnail size.
@@ -23,8 +27,14 @@ If one or more repeated issues are found, return exactly one lowercase line in t
 
 `thumbnails look unprofessional, issue 1, issue 2, issue 3`
 
-Start the line with exactly `thumbnails look unprofessional`. After that phrase, include only two or three common issues found in the images, in order of impact. Every issue must be no more than three words long. Do not add headings, explanations, counts, recommendations, or punctuation other than the commas separating issues.
+After `thumbnails look unprofessional`, include only two or three common issues found in the images, in order of impact. Every issue must be no more than three words long. Do not add headings, explanations, counts, recommendations, or punctuation other than the commas separating issues.
 
 If no repeated thumbnail issues are found, return exactly:
 
 `no issues in thumbnails`
+
+When a missing banner is confirmed and thumbnail issues are also found, start the line with `no channel banner, ` followed by the complete thumbnail issue line. For example:
+
+`no channel banner, thumbnails look unprofessional, weak branding, inconsistent graphics`
+
+When the banner is the only issue, return exactly `no channel banner`. Do not return `no issues in thumbnails` for a channel with no banner.

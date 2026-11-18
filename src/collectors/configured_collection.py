@@ -23,10 +23,9 @@ CHANNEL_FIELDS = {"name": ("snippet", "title"), "description": ("snippet", "desc
 VIDEO_FIELDS = {"title", "description", "tags", "publishedAt", "thumbnails", "liveBroadcastContent", "duration", "viewCount"}
 
 
-def _collect_posts_http(channel_id: str, limit: int) -> dict:
+def _collect_posts_http(posts_url: str, limit: int) -> dict:
     """Collect the initial public Posts page without scrolling."""
-    url = f"https://www.youtube.com/channel/{channel_id}/posts?hl=en"
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
+    request = Request(f"{posts_url}?hl=en", headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
     with urlopen(request, timeout=30) as response:
         html = response.read().decode("utf-8", "ignore")
     match = re.search(r"var ytInitialData = (\{.*?\});", html)
@@ -73,20 +72,68 @@ def _download_image(url: str | None, destination: Path) -> bool:
         return False
 
 
-def _download_thumbnail_assets(run_dir: Path, channel: dict, videos: list[dict], limit: int | None = None) -> dict:
+def _videos_tab_ids(html: str, limit: int) -> list[str]:
+    match = re.search(r"var ytInitialData\s*=\s*", html)
+    if not match:
+        return []
+    data, _ = json.JSONDecoder().raw_decode(html, match.end())
+    tabs = data.get("contents", {}).get("twoColumnBrowseResultsRenderer", {}).get("tabs", [])
+    for entry in tabs:
+        tab = entry.get("tabRenderer", {})
+        if tab.get("selected") and tab.get("title") == "Videos":
+            grid = tab.get("content", {}).get("richGridRenderer", {}).get("contents", [])
+            break
+    else:
+        return []
+
+    ids = {}
+    for entry in grid:
+        item = entry.get("richItemRenderer", {}).get("content", {})
+        video_id = item.get("videoRenderer", {}).get("videoId", "")
+        lockup = item.get("lockupViewModel", {})
+        if lockup.get("contentType") == "LOCKUP_CONTENT_TYPE_VIDEO":
+            video_id = lockup.get("contentId", "")
+        if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+            ids[video_id] = None
+            if len(ids) == limit:
+                break
+    return list(ids)
+
+
+def _collect_thumbnail_videos(client, channel_id: str, records: dict, limit: int) -> tuple[list[dict], str]:
+    url = f"https://www.youtube.com/channel/{channel_id}/videos?hl=en"
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
+    try:
+        with urlopen(request, timeout=15) as response:
+            ids = _videos_tab_ids(response.read().decode("utf-8", "replace"), limit)
+    except (OSError, ValueError):
+        return [], "videos_tab_unavailable"
+    if not ids:
+        return [], "no_verified_videos"
+
+    missing = [video_id for video_id in ids if not records.get(video_id, {}).get("snippet", {}).get("thumbnails")]
+    for start in range(0, len(missing), 50):
+        try:
+            details = client.get("videos", part="snippet", fields="items(id,snippet(channelId,thumbnails))",
+                                 id=",".join(missing[start:start + 50]))
+        except YouTubeAPIError:
+            break
+        records.update({item["id"]: item for item in details.get("items", [])
+                        if item.get("snippet", {}).get("channelId") == channel_id})
+    return [records[video_id] for video_id in ids if video_id in records], "videos_tab"
+
+
+def _download_thumbnail_assets(run_dir: Path, channel: dict, videos: list[dict]) -> dict:
     asset_dir = run_dir / "normalized" / "channel-issues" / "thumbnail-analysis"
     asset_dir.mkdir(parents=True, exist_ok=True)
     downloaded = {"banner": False, "videos": 0}
     banner_url = channel.get("brandingSettings", {}).get("image", {}).get("bannerExternalUrl")
     downloaded["banner"] = _download_image(banner_url, asset_dir / "banner.png")
-    ordered = sorted(videos, key=lambda item: item.get("snippet", {}).get("publishedAt", ""), reverse=True)
-    if limit is not None:
-        ordered = ordered[:limit]
-    for index, video in enumerate(ordered, start=1):
+    for video in videos:
         thumbnails = video.get("snippet", {}).get("thumbnails", {})
         thumbnail = thumbnails.get("maxres") or thumbnails.get("standard") or thumbnails.get("high") or thumbnails.get("medium") or thumbnails.get("default")
         url = thumbnail.get("url") if isinstance(thumbnail, dict) else None
-        if _download_image(url, asset_dir / f"video-{index}.png"):
+        if _download_image(url, asset_dir / f"video-{downloaded['videos'] + 1}.png"):
             downloaded["videos"] += 1
     return downloaded
 
@@ -210,11 +257,14 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     run_dir = channel_dir / f"V{version} - {run_id}"
     write_json(run_dir / "raw/channel-response.json", response)
     community_rule = profile.get("community_posts", {})
+    posts_url = (f"https://www.youtube.com/{ref.filter_value}/posts" if ref.filter_name == "forHandle"
+                 else f"https://www.youtube.com/channel/{channel['id']}/posts")
     post_executor = ThreadPoolExecutor(max_workers=1) if community_rule.get("enabled") else None
     post_future = post_executor.submit(
-        _collect_posts_http, channel["id"], community_rule.get("limit", 0)
+        _collect_posts_http, posts_url, community_rule.get("limit", 0)
     ) if post_executor else None
     videos, candidates, seen = [], [], set()
+    thumbnail_records = {}
     token = None
     exhausted = False
     cap = profile.get("max_uploads_to_scan", 300)
@@ -311,6 +361,8 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                                  fields="items(" + selector + ")", id=",".join(ids))
             write_json(run_dir / f"raw/videos-{page:04}.json", details)
             by_id = {v["id"]: v for v in details.get("items", [])}
+            if thumbnail_limit:
+                thumbnail_records.update(by_id)
             for vid in ids:
                 item = by_id.get(vid)
                 if not item:
@@ -393,7 +445,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     coverage = profile.get("activity_coverage", {})
     if community_rule.get("enabled") and community["status"] != "complete":
         write_json(run_dir / "browser-collection-request.json", {
-            "channel_url": f"https://www.youtube.com/channel/{channel['id']}/posts",
+            "channel_url": posts_url,
             "community_posts": community_rule, "activity_coverage": coverage,
             "instruction": "HTTP collection did not produce posts. Collect with a browser and save posts in normalized/community-posts.json.",
         })
@@ -419,7 +471,16 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
               "total_videos_retrieved": len(videos), "total_shorts_retrieved": len(candidates),
               "playlists": playlists, "playlist_status": playlist_status,
               "community_posts": community, "collection_metadata": metadata}
-    result["thumbnail_assets"] = _download_thumbnail_assets(run_dir, channel, videos, thumbnail_limit)
+    thumbnail_videos, thumbnail_status = [], "not_requested"
+    if thumbnail_limit:
+        thumbnail_videos, thumbnail_status = _collect_thumbnail_videos(client, channel["id"], thumbnail_records,
+                                                                       thumbnail_limit)
+        if thumbnail_status == "videos_tab_unavailable":
+            thumbnail_videos = sorted(videos, key=lambda video: video.get("snippet", {}).get("publishedAt", ""),
+                                      reverse=True)[:thumbnail_limit]
+            thumbnail_status = "api_duration_fallback"
+    result["thumbnail_assets"] = _download_thumbnail_assets(run_dir, channel, thumbnail_videos)
+    result["thumbnail_assets"]["source_status"] = thumbnail_status
     write_json(run_dir / "normalized/collection.json", {"collection_scope": "configured_channel", "requested_input": channel_input, **result})
     write_json(run_dir / "normalized/recent-videos.json", {"total_videos_retrieved": len(videos), "videos": videos})
     write_json(run_dir / "normalized/shorts-candidates.json", {"total_shorts_retrieved": len(candidates), "videos": candidates,

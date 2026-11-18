@@ -22,22 +22,32 @@ Read `total_shorts`, `analysis_date`, `latest_short_published`, the formatted `p
 
    Replace x with the completed whole number of months. Use months for the wording even when x is greater than one.
 
-4. Evaluate all upload gaps, current-month activity, and weekly activity. Treat the schedule as irregular when the gaps show a break of more than 7 days, or repeated gaps of 5 or more days that make the weekly schedule inconsistent. Also treat a channel as irregular when it was active in the earlier observed history but has published only one or two Shorts during the current calendar month or the most recent 30-day period. In that case, return:
+4. If the channel has around 20 or fewer total Shorts and the latest was published at least two completed weeks ago, return:
+   last short uploaded x weeks ago - limited activity
+
+   Replace x with the number of completed weeks since the latest Short. The month and year inactivity rules above take precedence.
+
+5. If the channel has fewer than 10 total Shorts and any observed gap is at least 5 days, return:
+   only x shorts published - limited activity
+
+   Replace x with the verified total number of Shorts. Include the gap between the latest Short and the analysis date, as well as gaps between uploads. Do not use the size of a truncated sample as the total.
+
+6. Evaluate all upload gaps, current-month activity, and weekly activity. Treat the schedule as irregular when the gaps show a break of more than 7 days, or repeated gaps of 5 or more days that make the weekly schedule inconsistent. Also treat a channel as irregular when it was active in the earlier observed history but has published only one or two Shorts during the current calendar month or the most recent 30-day period. In that case, return:
    irregular shorts posting - no content calendar
 
-5. If the channel posts about one Short per week and the posting days are regular, return:
+7. If the channel posts about one Short per week and the posting days are regular, return:
    posting 1 short a week - needs improvement
 
-6. If the channel posts about one Short per week but the posting days are irregular, return:
+8. If the channel posts about one Short per week but the posting days are irregular, return:
    irregular shorts posting - only 1 per week
 
-7. If the channel posts about two Shorts per week and the posting days are regular, return:
+9. If the channel posts about two Shorts per week and the posting days are regular, return:
    posting 2 shorts a week - needs improvement
 
-8. If the channel posts about two Shorts per week but the posting days are irregular, return:
+10. If the channel posts about two Shorts per week but the posting days are irregular, return:
    irregular shorts posting - only 2 per week
 
-9. If the channel posts around three or more Shorts per week then return:
+11. If the channel posts around three or more Shorts per week then return:
    no issues in short activity
 
 ## Frequency and regularity
@@ -52,6 +62,6 @@ For recency, compare the latest publication date with the analysis date and coun
 
 ## Output
 
-Return only one lowercase line. Do not include counts, explanations, headings, recommendations, or punctuation beyond the output text.
+Return only one lowercase line in the matching format, including the specified count when required. Do not add explanations, headings, or recommendations.
 
 
