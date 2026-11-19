@@ -190,19 +190,24 @@ def build_performance_skill_data(channel_data, recent_videos, config, collected=
     max_age_months = config.get("max_age_months", 0)
     if type(max_age_months) is not int or not 0 <= max_age_months <= 12:
         raise ValueError("max_age_months must be an integer from 0 through 12.")
-    source_videos = recent_videos
+    source_videos = collected.get("performance_videos", recent_videos)
     if max_age_months:
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_months * 30.4375)
-        source_videos = []
-        for video in recent_videos:
+        filtered_videos = []
+        for video in source_videos:
             published = video.get("snippet", {}).get("publishedAt")
             try:
                 published_at = datetime.fromisoformat(published.replace("Z", "+00:00"))
             except (AttributeError, ValueError):
                 continue
             if published_at >= cutoff:
-                source_videos.append(video)
-    selected, missing = _select_records(source_videos, rule, RECORD_PATHS, "videos", limit)
+                filtered_videos.append(video)
+        source_videos = filtered_videos
+    performance_rule = dict(rule[0] if isinstance(rule, list) else rule)
+    if "performance_videos" in collected:
+        performance_rule["videoId"] = True
+    selected, missing = _select_records(source_videos, performance_rule,
+                                        {**RECORD_PATHS, "videoId": ("id",)}, "videos", limit)
     selected.sort(key=lambda item: item.get("publishedAt") or "", reverse=True)
     high_count = config.get("high_view_outliers", 0)
     low_count = config.get("low_view_outliers", 0)
@@ -218,6 +223,7 @@ def build_performance_skill_data(channel_data, recent_videos, config, collected=
             views = 0
         reach = round((views / subscriber_count) * 100, 2) if subscriber_count else None
         videos.append({
+            **({"videoId": item["videoId"]} if item.get("videoId") else {}),
             "title": item.get("title"),
             "publishedAt": item.get("publishedAt"),
             "viewCount": views,
@@ -265,6 +271,9 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
     if config.get("total_shorts"):
         output["total_shorts"] = collected.get("total_shorts", len(collected.get("shorts_candidates", [])))
     community = collected.get("community_posts", {})
+    inventory = collected.get("channel_tabs", {})
+    names = {str(tab.get("name", "")).strip().casefold() for tab in inventory.get("tabs", []) if isinstance(tab, dict)}
+    tab_status = {name: ("available" if name in names else "not_visible") if inventory.get("status") == "complete" else "unknown" for name in ("shorts", "playlists", "posts")}
     sources = {
         "videos": (recent_videos, RECORD_PATHS),
         "shorts": (collected.get("shorts_candidates", []), RECORD_PATHS),
@@ -306,7 +315,10 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
             shorts = output.pop(section)
             total_shorts = output.pop(count_key)
             output = {
-                "total_shorts": total_shorts,
+                "total_shorts": 0 if collected.get("collection_metadata", {}).get("shorts_status") == "no_visible_shorts" else None,
+                "shorts_status": collected.get("collection_metadata", {}).get("shorts_status", "unavailable"),
+                "shorts_tab_status": tab_status["shorts"],
+                "shorts_tab_finding": "publishing no shorts" if tab_status["shorts"] == "not_visible" else None,
                 "analysis_date": datetime.now(timezone.utc).strftime("%a - %d - %b - %y"),
                 "latest_short_published": _format_elapsed_since(original_latest) if original_latest else "unknown",
                 # Keep the legacy key for existing skill packages.
@@ -317,8 +329,12 @@ def build_skill_data(channel_data, recent_videos, config, collected=None):
             }
         if section == "community_posts":
             output["community_status"] = community.get("status", "not_collected")
+            output["posts_tab_status"] = tab_status["posts"]
+            output["posts_tab_finding"] = "publishing no posts" if tab_status["posts"] == "not_visible" else None
         if section == "playlists":
             output["playlist_status"] = collected.get("playlist_status", "not_collected")
+            output["playlists_tab_status"] = tab_status["playlists"]
+            output["playlists_tab_finding"] = "publishing no playlists" if tab_status["playlists"] == "not_visible" else None
     if config.get("collection_metadata"):
         output["collection_metadata"] = collected.get("collection_metadata", {})
     if missing:

@@ -23,6 +23,39 @@ CHANNEL_FIELDS = {"name": ("snippet", "title"), "description": ("snippet", "desc
 VIDEO_FIELDS = {"title", "description", "tags", "publishedAt", "thumbnails", "liveBroadcastContent", "duration", "viewCount"}
 
 
+def _channel_tabs_from_html(html: str, channel_id: str) -> dict:
+    match = re.search(r"var ytInitialData\s*=\s*", html)
+    if not match:
+        return {"status": "unavailable", "tabs": []}
+    data, _ = json.JSONDecoder().raw_decode(html, match.end())
+    metadata = data.get("metadata", {}).get("channelMetadataRenderer", {})
+    if metadata.get("externalId") != channel_id:
+        return {"status": "unavailable", "tabs": []}
+    entries = data.get("contents", {}).get("twoColumnBrowseResultsRenderer", {}).get("tabs", [])
+    tabs = []
+    for entry in entries:
+        tab = entry.get("tabRenderer", {})
+        title = tab.get("title")
+        if title:
+            tabs.append({"name": title, "selected": bool(tab.get("selected"))})
+    return {"status": "complete" if tabs else "unavailable", "tabs": tabs}
+
+
+def _collect_channel_tabs(channel_id: str, run_dir: Path) -> dict:
+    url = f"https://www.youtube.com/channel/{channel_id}?hl=en"
+    try:
+        request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
+        with urlopen(request, timeout=15) as response:
+            html = response.read().decode("utf-8", "replace")
+        (run_dir / "raw" / "channel-page.html").write_text(html, encoding="utf-8")
+        result = _channel_tabs_from_html(html, channel_id)
+    except (OSError, ValueError, TypeError, AttributeError):
+        result = {"status": "unavailable", "tabs": []}
+    result["source_url"] = url
+    write_json(run_dir / "normalized" / "channel-tabs.json", result)
+    return result
+
+
 def _collect_posts_http(posts_url: str, limit: int) -> dict:
     """Collect the initial public Posts page without scrolling."""
     request = Request(f"{posts_url}?hl=en", headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
@@ -32,6 +65,19 @@ def _collect_posts_http(posts_url: str, limit: int) -> dict:
     if not match:
         return {"status": "http_no_data", "posts": []}
     data = json.loads(match.group(1))
+    contents = data.get("contents")
+    if not isinstance(contents, dict):
+        return {"status": "http_no_data", "posts": []}
+    tabs = contents.get("twoColumnBrowseResultsRenderer", {}).get("tabs", [])
+    posts_tab = None
+    for entry in tabs:
+        tab = entry.get("tabRenderer", {})
+        endpoint = tab.get("endpoint", {}).get("commandMetadata", {}).get("webCommandMetadata", {}).get("url", "")
+        if tab.get("selected") and (tab.get("title", "").strip().casefold() == "posts" or endpoint.rstrip("/").endswith("/posts")):
+            posts_tab = tab
+            break
+    if posts_tab is None:
+        return {"status": "http_no_data", "posts": []}
     posts, seen = [], set()
 
     def text(value):
@@ -56,8 +102,38 @@ def _collect_posts_http(posts_url: str, limit: int) -> dict:
             for child in value:
                 walk(child)
 
-    walk(data)
+    walk(posts_tab.get("content", {}))
     return {"status": "complete" if posts else "http_no_posts", "posts": posts}
+
+
+def _shorts_page_ids(html: str, limit: int) -> tuple[list[str], str]:
+    match = re.search(r"var ytInitialData\s*=\s*", html)
+    if not match:
+        return [], "unavailable"
+    data, _ = json.JSONDecoder().raw_decode(html, match.end())
+    tabs = data.get("contents", {}).get("twoColumnBrowseResultsRenderer", {}).get("tabs", [])
+    selected = next((e.get("tabRenderer", {}) for e in tabs if e.get("tabRenderer", {}).get("selected")), {})
+    titles = [e.get("tabRenderer", {}).get("title", "").casefold() for e in tabs]
+    if selected.get("title", "").casefold() != "shorts":
+        if selected.get("title", "").casefold() == "home" and "videos" in titles and "shorts" not in titles:
+            return [], "no_visible_shorts"
+        return [], "unavailable"
+    content = selected.get("content")
+    if not isinstance(content, dict):
+        return [], "unavailable"
+    ids = {}
+    def walk(node):
+        if isinstance(node, dict):
+            item = node.get("shortsLockupViewModel", {})
+            endpoint = item.get("onTap", {}).get("innertubeCommand", {}).get("reelWatchEndpoint", {})
+            vid = endpoint.get("videoId", "") or item.get("entityId", "").removeprefix("shorts-shelf-item-")
+            if re.fullmatch(r"[A-Za-z0-9_-]{11}", vid): ids[vid] = None
+            for value in node.values(): walk(value)
+        elif isinstance(node, list):
+            for value in node: walk(value)
+    walk(content)
+    if ids: return list(ids)[:limit], "complete"
+    return [], "unavailable"
 
 
 def _download_image(url: str | None, destination: Path) -> bool:
@@ -72,7 +148,7 @@ def _download_image(url: str | None, destination: Path) -> bool:
         return False
 
 
-def _videos_tab_ids(html: str, limit: int) -> list[str]:
+def _videos_tab_ids(html: str, limit: int | None = None) -> list[str]:
     match = re.search(r"var ytInitialData\s*=\s*", html)
     if not match:
         return []
@@ -95,17 +171,23 @@ def _videos_tab_ids(html: str, limit: int) -> list[str]:
             video_id = lockup.get("contentId", "")
         if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
             ids[video_id] = None
-            if len(ids) == limit:
+            if limit is not None and len(ids) == limit:
                 break
     return list(ids)
 
 
-def _collect_thumbnail_videos(client, channel_id: str, records: dict, limit: int) -> tuple[list[dict], str]:
+def _collect_thumbnail_videos(client, channel_id: str, records: dict, limit: int, run_dir: Path | None = None) -> tuple[list[dict], str]:
     url = f"https://www.youtube.com/channel/{channel_id}/videos?hl=en"
     request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
     try:
         with urlopen(request, timeout=15) as response:
-            ids = _videos_tab_ids(response.read().decode("utf-8", "replace"), limit)
+            html = response.read().decode("utf-8", "replace")
+        if run_dir is not None:
+            (run_dir / "raw" / "videos-page.html").write_text(html, encoding="utf-8")
+        all_ids = _videos_tab_ids(html)
+        if run_dir is not None:
+            write_json(run_dir / "normalized" / "videos-page-ids.json", {"source_url": url, "video_ids": all_ids})
+        ids = all_ids[:limit]
     except (OSError, ValueError):
         return [], "videos_tab_unavailable"
     if not ids:
@@ -256,6 +338,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     version = max(versions, default=0) + 1
     run_dir = channel_dir / f"V{version} - {run_id}"
     write_json(run_dir / "raw/channel-response.json", response)
+    channel_tabs = _collect_channel_tabs(channel["id"], run_dir)
     community_rule = profile.get("community_posts", {})
     posts_url = (f"https://www.youtube.com/{ref.filter_value}/posts" if ref.filter_name == "forHandle"
                  else f"https://www.youtube.com/channel/{channel['id']}/posts")
@@ -278,64 +361,37 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     fields = sorted(set(profile.get("videos", {}).get("fields", [])) |
                     set(profile.get("shorts", {}).get("fields", [])))
     shorts_confirmed = False
-    if shorts_limit and channel.get("id", "").startswith("UC"):
-        shorts_playlist = "UUSH" + channel["id"][2:]
-        fallback_candidates = candidates
-        candidates = []
-        shorts_token = None
-        shorts_page = 0
-        shorts_seen = set()
+    shorts_status = "not_requested" if not shorts_limit else "unavailable"
+    candidates = []
+    if shorts_limit:
+        url = f"https://www.youtube.com/channel/{channel['id']}/shorts?hl=en"
         try:
-            while len(candidates) < shorts_limit:
-                shorts_page += 1
-                listing = client.get(
-                    "playlistItems",
-                    part="contentDetails",
-                    playlistId=shorts_playlist,
-                    fields="items(contentDetails(videoId)),nextPageToken",
-                    maxResults=min(50, shorts_limit - len(candidates)),
-                    pageToken=shorts_token,
-                )
-                write_json(run_dir / f"raw/shorts-uploads-{shorts_page:04}.json", listing)
-                ids = [item["contentDetails"]["videoId"] for item in listing.get("items", [])]
-                ids = [vid for vid in dict.fromkeys(ids) if vid not in shorts_seen]
-                shorts_seen.update(ids)
-                if not ids:
-                    break
-                selector = "id,contentDetails(duration)"
-                snippet_fields = sorted((set(fields) - {"duration", "viewCount"}) | {"publishedAt"})
-                if snippet_fields:
-                    selector += ",snippet(" + ",".join(snippet_fields) + ")"
-                parts = "contentDetails,snippet"
-                if "viewCount" in fields:
-                    selector += ",statistics(viewCount)"
-                    parts += ",statistics"
-                details = client.get("videos", part=parts,
-                                     fields="items(" + selector + ")", id=",".join(ids))
-                write_json(run_dir / f"raw/shorts-videos-{shorts_page:04}.json", details)
-                by_id = {item["id"]: item for item in details.get("items", [])}
-                for vid in ids:
-                    item = by_id.get(vid)
-                    if item:
-                        duration_match = re.fullmatch(
-                            r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?",
-                            item.get("contentDetails", {}).get("duration", ""),
-                        )
-                        if not duration_match:
-                            continue
-                        hours, minutes, seconds = (float(value or 0) for value in duration_match.groups())
-                        duration = hours * 3600 + minutes * 60 + seconds
-                        if 0 < duration <= 180:
-                            candidates.append(project_video(item, profile.get("shorts", {}).get("fields", [])))
-                        if len(candidates) >= shorts_limit:
-                            break
-                shorts_token = listing.get("nextPageToken")
-                if not shorts_token:
-                    break
-            shorts_confirmed = bool(candidates)
-        except YouTubeAPIError:
-            shorts_confirmed = False
-            candidates = fallback_candidates[:shorts_limit]
+            request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
+            with urlopen(request, timeout=15) as response:
+                html = response.read().decode("utf-8", "replace")
+            (run_dir / "raw" / "shorts-page.html").write_text(html, encoding="utf-8")
+            shorts_ids, shorts_status = _shorts_page_ids(html, shorts_limit)
+            page_tabs = _channel_tabs_from_html(html, channel["id"])
+            if page_tabs["status"] != "complete":
+                shorts_ids, shorts_status = [], "unavailable"
+            elif shorts_status == "unavailable" and channel_tabs["status"] == "complete":
+                names = {tab["name"].casefold() for tab in channel_tabs["tabs"]}
+                selected_tabs = {tab["name"].casefold() for tab in page_tabs["tabs"] if tab["selected"]}
+                if "shorts" not in names and selected_tabs.intersection({"home", "videos"}):
+                    shorts_status = "no_visible_shorts"
+            write_json(run_dir / "normalized" / "shorts-page-ids.json", {"source_url": url, "video_ids": shorts_ids, "status": shorts_status})
+            if shorts_ids:
+                details = client.get("videos", part="snippet,contentDetails,statistics", id=",".join(shorts_ids))
+                write_json(run_dir / "raw" / "shorts-videos-0001.json", details)
+                by_id = {v["id"]: v for v in details.get("items", []) if v.get("snippet", {}).get("channelId") == channel["id"]}
+                if len(by_id) != len(shorts_ids):
+                    shorts_status = "unavailable"
+                else:
+                    candidates = [project_video(by_id[vid], profile.get("shorts", {}).get("fields", [])) for vid in shorts_ids]
+                    shorts_confirmed = True
+        except (OSError, ValueError, YouTubeAPIError):
+            shorts_status = "unavailable"
+            candidates = []
     page = 0
     while (video_limit or shorts_limit) and scanned < cap:
         page += 1
@@ -385,7 +441,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                 else:
                     shorts_scanned += 1
                 target = videos if section == "videos" else candidates
-                if section == "shorts" and shorts_confirmed:
+                if section == "shorts":
                     continue
                 section_limit = video_limit if section == "videos" else shorts_limit
                 if len(target) < section_limit:
@@ -447,9 +503,9 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
         write_json(run_dir / "browser-collection-request.json", {
             "channel_url": posts_url,
             "community_posts": community_rule, "activity_coverage": coverage,
-            "instruction": "HTTP collection did not produce posts. Collect with a browser and save posts in normalized/community-posts.json.",
+            "instruction": "HTTP collection did not verify Posts-tab posts. Inspect the channel's /posts page in a browser only; do not use the separate /community feed. Save the result in normalized/community-posts.json.",
         })
-    metadata = {"shorts_confirmed": shorts_confirmed, "uploads_scanned": scanned,
+    metadata = {"shorts_confirmed": shorts_confirmed, "shorts_status": shorts_status, "channel_tabs_status": channel_tabs["status"], "uploads_scanned": scanned,
                 "total_long_videos_scanned": long_videos_scanned,
                 "total_shorts_scanned": shorts_scanned,
                 "uploads_exhausted": exhausted, "missing_videos": missing, "unknown_durations": unknown,
@@ -464,7 +520,7 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
                                 "complete_history": exhausted and not missing and not unknown}
     if coverage.get("record_collection_status"):
         metadata["status"] = "partial" if shorts_limit or missing or unknown or community_rule.get("enabled") or len(videos) < video_limit else "ready"
-    result = {"channel": channel, "videos": videos, "shorts_candidates": candidates,
+    result = {"channel": channel, "channel_tabs": channel_tabs, "videos": videos, "shorts_candidates": candidates,
               "total_public_videos": channel.get("statistics", {}).get("videoCount", 0),
               "total_long_videos": long_videos_scanned,
               "total_shorts": shorts_scanned,
@@ -474,17 +530,31 @@ def collect_configured(channel_input, output_root, client, profile_path=DEFAULT_
     thumbnail_videos, thumbnail_status = [], "not_requested"
     if thumbnail_limit:
         thumbnail_videos, thumbnail_status = _collect_thumbnail_videos(client, channel["id"], thumbnail_records,
-                                                                       thumbnail_limit)
+                                                                       thumbnail_limit, run_dir)
         if thumbnail_status == "videos_tab_unavailable":
             thumbnail_videos = sorted(videos, key=lambda video: video.get("snippet", {}).get("publishedAt", ""),
                                       reverse=True)[:thumbnail_limit]
             thumbnail_status = "api_duration_fallback"
     result["thumbnail_assets"] = _download_thumbnail_assets(run_dir, channel, thumbnail_videos)
     result["thumbnail_assets"]["source_status"] = thumbnail_status
+    ids_file = run_dir / "normalized" / "videos-page-ids.json"
+    if ids_file.exists():
+        performance_ids = json.loads(ids_file.read_text(encoding="utf-8"))["video_ids"][:20]
+        if performance_ids:
+            performance_response = client.get(
+                "videos", part="snippet,statistics",
+                fields="items(id,snippet(channelId,title,publishedAt),statistics(viewCount))",
+                id=",".join(performance_ids),
+            )
+            write_json(run_dir / "raw" / "performance-videos.json", performance_response)
+            indexed = {item["id"]: item for item in performance_response.get("items", [])
+                       if item.get("snippet", {}).get("channelId") == channel["id"]}
+            result["performance_videos"] = [indexed[video_id] for video_id in performance_ids if video_id in indexed]
+            result["performance_missing_video_ids"] = [video_id for video_id in performance_ids if video_id not in indexed]
     write_json(run_dir / "normalized/collection.json", {"collection_scope": "configured_channel", "requested_input": channel_input, **result})
     write_json(run_dir / "normalized/recent-videos.json", {"total_videos_retrieved": len(videos), "videos": videos})
     write_json(run_dir / "normalized/shorts-candidates.json", {"total_shorts_retrieved": len(candidates), "videos": candidates,
-               "classification": "Unconfirmed: duration at most 180 seconds; API does not expose Shorts status."})
+               "classification": "Shorts tab IDs" if shorts_confirmed else shorts_status})
     write_json(run_dir / "collection-profile.json", profile)
     write_json(run_dir / "normalized/playlists.json", {"status": playlist_status, "playlists": playlists})
     write_json(run_dir / "normalized/community-posts.json", community)

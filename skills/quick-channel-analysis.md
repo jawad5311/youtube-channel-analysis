@@ -92,6 +92,6 @@ or, when execution fails or required input or output is missing:
 
 `skill status: <skill name> - not executed successfully - <reason>`
 
-The status line must appear on screen. Do not write execution status into a specialist skill output file. Specialist output files must contain only that skill's analysis result. Do not mark a skill successful until its output file exists and is non-empty. For thumbnail analysis, inspect every image file in the supplied thumbnail input folder, including the banner when present. For community activity, use the completed HTTP `/posts` collection when available, and use the browser handoff only when HTTP collection fails. The final result may be returned only after all required skills have a status line.
+The status line must appear on screen. Do not write execution status into a specialist skill output file. Specialist output files must contain only that skill's analysis result. Do not mark a skill successful until its output file exists and is non-empty. For thumbnail analysis, inspect every image file in the supplied thumbnail input folder, including the banner when present. For community activity, inspect only the channel's actual `/posts` tab, using the HTTP collection or browser handoff. Never use the separate `/community` discussion feed; an unavailable or unverified Posts tab is insufficient data. The final result may be returned only after all required skills have a status line.
 
 

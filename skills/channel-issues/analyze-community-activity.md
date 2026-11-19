@@ -5,12 +5,14 @@ description: Inspect a YouTube channel's Posts page in a browser and return one 
 
 # Analyze Community Activity
 
+If `posts_tab_status` is `not_visible`, return exactly `publishing no posts`. An `unknown` tab status is not evidence of a missing tab; inspect the Posts page as described below.
+
 Use a browser to inspect the requested channel's public Posts page, then return one lowercase verdict. No headings, explanations, bullets, code fences, or trailing punctuation.
 
 ## Browser collection
 
 1. Resolve the user's channel handle or channel ID. Open `https://www.youtube.com/@handle/posts` or the resolved channel's Posts tab using the available browser tool. Follow the browser tool's instructions and read its applicable computer-use skill before operating it. Retain the @ in a handle URL; do not substitute a similarly named channel.
-2. Confirm the channel identity and that the page has loaded. If YouTube redirects or renames the tab, follow the actual channel navigation to Posts. Do not infer absence from a missing tab, login wall, loading error, or unavailable browser.
+2. Confirm the channel identity and that the actual Posts tab has loaded. Inspect only creator-published posts on that tab. Never use the separate `/community` discussion page, even if it contains creator-authored posts. If the page redirects or the feed cannot be verified and the tab inventory is unknown, return insufficient data.
 3. Inspect channel-authored posts. Count text, image, poll, quiz, and video-share posts. Exclude viewer posts, comments, replies, and video uploads that are not posts. Record post IDs or permalinks, visible publication dates, and the observation date internally; deduplicate posts.
 4. Check the most recent publication, accounting for older pinned posts. Do not treat an edit date as a new publication. Read relative date labels against the observation date; seek an exact date when available and relevant. Never invent an exact date from a rounded label.
 5. For an active channel, collect the available posts from the initial Posts response. A one-post or two-post result is valid evidence when each post has a publication time. Use the available history and do not return insufficient data merely because the sample is small.

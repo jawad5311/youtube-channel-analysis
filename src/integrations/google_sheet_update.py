@@ -23,7 +23,8 @@ from src.integrations.google_sheets_auth import authorize
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNS_ROOT = PROJECT_ROOT / "runs"
 COUNTRIES = {
-    "AU": "Australia", "CA": "Canada", "DK": "Denmark", "DE": "Germany",
+    "AE": "United Arab Emirates",
+    "AU": "Australia", "CA": "Canada", "DK": "Denmark", "DE": "Germany", "FI": "Finland",
     "IN": "India", "NZ": "New Zealand", "PK": "Pakistan", "GB": "UK",
     "United Kingdom": "UK",
     "US": "United States",

@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.collectors.configured_collection import _collect_posts_http, _collect_thumbnail_videos, collect_configured, load_profile
-from src.analysis.skill_inputs import prepare_skill_inputs
+from src.collectors.configured_collection import _collect_posts_http, _collect_thumbnail_videos, _shorts_page_ids, _channel_tabs_from_html, collect_configured, load_profile
+from src.analysis.skill_inputs import build_performance_skill_data, prepare_skill_inputs
 
 
 class FakeClient:
@@ -38,11 +38,54 @@ class FakeClient:
 
 
 class ConfiguredCollectionTests(unittest.TestCase):
+    def test_channel_tabs_require_matching_channel_identity(self):
+        data = {'metadata': {'channelMetadataRenderer': {'externalId': 'UCexample'}}, 'contents': {'twoColumnBrowseResultsRenderer': {'tabs': [{'tabRenderer': {'title': 'Videos', 'selected': True}}, {'tabRenderer': {'title': 'Playlists'}}]}}}
+        html = 'var ytInitialData = ' + json.dumps(data) + ';'
+        result = _channel_tabs_from_html(html, 'UCexample')
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual([t['name'] for t in result['tabs']], ['Videos', 'Playlists'])
+        self.assertEqual(_channel_tabs_from_html(html, 'UCother')['status'], 'unavailable')
+    def test_shorts_page_distinguishes_home_short_list_and_invalid_response(self):
+        def html(tabs):
+            return 'var ytInitialData = ' + json.dumps({'contents': {'twoColumnBrowseResultsRenderer': {'tabs': [{'tabRenderer': t} for t in tabs]}}}) + ';'
+        home = html([{'title': 'Home', 'selected': True}, {'title': 'Videos'}])
+        self.assertEqual(_shorts_page_ids(home, 30), ([], 'no_visible_shorts'))
+        self.assertEqual(_shorts_page_ids('invalid', 30), ([], 'unavailable'))
+        shorts = html([{'title': 'Shorts', 'selected': True, 'content': {'shortsLockupViewModel': {'onTap': {'innertubeCommand': {'reelWatchEndpoint': {'videoId': 'abcdefghijk'}}}}}}])
+        self.assertEqual(_shorts_page_ids(shorts, 30), (['abcdefghijk'], 'complete'))
+    def test_performance_uses_videos_tab_records_and_preserves_ids(self):
+        records = [{"id": "first", "snippet": {"title": "Short landscape", "publishedAt": "2026-11-01T00:00:00Z"},
+                    "statistics": {"viewCount": "100"}},
+                   {"id": "second", "snippet": {"title": "Other video", "publishedAt": "2026-10-01T00:00:00Z"},
+                    "statistics": {"viewCount": "9000"}}]
+        config = {"total_videos": 20, "high_view_outliers": 1, "max_age_months": 0,
+                  "videos": [{"title": True, "publishedAt": True, "viewCount": True}]}
+        result = build_performance_skill_data({"statistics": {"subscriberCount": "1000"}}, [], config,
+                                              {"performance_videos": records})
+        self.assertEqual([video["videoId"] for video in result["videos"]], ["first"])
+        self.assertEqual(result["average_views"], 100)
+
     def test_posts_request_uses_supplied_handle_posts_url(self):
         html = b'var ytInitialData = {"contents": []};'
         with patch("src.collectors.configured_collection.urlopen", return_value=io.BytesIO(html)) as open_url:
             _collect_posts_http("https://www.youtube.com/@CASBOTV/posts", 10)
         self.assertEqual(open_url.call_args.args[0].full_url, "https://www.youtube.com/@CASBOTV/posts?hl=en")
+
+    def test_posts_parser_uses_only_selected_posts_tab(self):
+        def post(post_id):
+            return {"backstagePostRenderer": {"postId": post_id, "publishedTimeText": {"runs": [{"text": "2 days ago"}]}}}
+
+        def response(title):
+            tabs = [{"tabRenderer": {"title": title, "selected": True, "content": {"items": [post("tab-post")]}}}]
+            data = {"contents": {"twoColumnBrowseResultsRenderer": {"tabs": tabs}}, "other": post("unrelated")}
+            return io.BytesIO(("var ytInitialData = " + json.dumps(data) + ";").encode())
+
+        with patch("src.collectors.configured_collection.urlopen", return_value=response("Posts")):
+            result = _collect_posts_http("https://www.youtube.com/@example/posts", 10)
+        self.assertEqual([p["postId"] for p in result["posts"]], ["tab-post"])
+        with patch("src.collectors.configured_collection.urlopen", return_value=response("Home")):
+            result = _collect_posts_http("https://www.youtube.com/@example/posts", 10)
+        self.assertEqual(result, {"status": "http_no_data", "posts": []})
 
     def test_failed_videos_tab_uses_api_long_videos_for_thumbnails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,11 +160,12 @@ class ConfiguredCollectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.json"
             path.write_text(json.dumps(self.profile()), encoding="utf-8")
-            run, data = collect_configured("@example", Path(tmp), client, path)
+            with patch("src.collectors.configured_collection.urlopen", side_effect=OSError("network offline")):
+                run, data = collect_configured("@example", Path(tmp), client, path)
             self.assertEqual(data["videos"][0], {"snippet": {"title": "Long"},
                              "contentDetails": {"duration": "PT15M"}, "statistics": {"viewCount": "123"}})
-            self.assertNotIn("id", data["shorts_candidates"][0])
-            self.assertNotIn("contentDetails", data["shorts_candidates"][0])
+            self.assertEqual(data["shorts_candidates"], [])
+            self.assertEqual(data["collection_metadata"]["shorts_status"], "unavailable")
             self.assertEqual(data["playlists"][0]["itemCount"], 2)
             self.assertIn(data["community_posts"]["status"], {"http_failed", "http_no_data", "http_no_posts"})
             self.assertTrue((run / "browser-collection-request.json").exists())
@@ -139,7 +183,7 @@ class ConfiguredCollectionTests(unittest.TestCase):
             niche = json.loads(files["niche_search"].read_text())
             self.assertEqual(niche["videos"], [{"title": "Long"}])
             issues = json.loads(files["issues"].read_text())
-            self.assertEqual(issues["total_shorts"], 1)
+            self.assertIsNone(issues["total_shorts"])
             self.assertRegex(issues["analysis_date"], r"^[A-Z][a-z]{2} - \d{2} - [A-Z][a-z]{2} - \d{2}$")
             self.assertIn(issues["community_status"], {"http_failed", "http_no_data", "http_no_posts"})
 
@@ -154,8 +198,8 @@ class ConfiguredCollectionTests(unittest.TestCase):
             client = FakeClient()
             _, data = collect_configured("@example", Path(tmp), client, path)
             self.assertEqual(data["collection_metadata"]["uploads_scanned"], 1)
-            self.assertEqual(len(data["shorts_candidates"]), 1)
-            self.assertEqual(sum(r == "playlistItems" for r, _ in client.calls), 3)
+            self.assertEqual(len(data["shorts_candidates"]), 0)
+            self.assertEqual(sum(r == "playlistItems" for r, _ in client.calls), 1)
 
     def test_current_profile_supported(self):
         self.assertEqual(load_profile()["max_uploads_to_scan"], 300)

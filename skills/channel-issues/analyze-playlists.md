@@ -9,6 +9,8 @@ Evaluate the supplied public playlist records and return one lowercase line. Ret
 
 ## Evidence
 
+If `playlists_tab_status` is `not_visible`, return exactly `publishing no playlists`. An `unknown` tab status is not evidence of a missing tab; use the playlist records and collection status below.
+
 Use the supplied custom public playlists. Each playlist record should contain its title, description, playlist URL or ID, item count, and included video titles when available.
 
 Ignore YouTube system playlists such as Uploads, Likes, and Favorites. Do not treat a channel's video count as evidence that it creates playlists. If playlist collection is incomplete or the records do not identify public custom playlists, return `insufficient data to evaluate playlists` unless verified page evidence establishes that no public playlists exist.
@@ -39,6 +41,10 @@ When only one issue applies, return that single label. A larger playlist item su
 ## Output
 
 Return only one of these exact lines:
+
+```text
+publishing no playlists
+```
 
 ```text
 creating no playlists

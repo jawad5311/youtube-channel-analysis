@@ -9,6 +9,10 @@ Read `total_shorts`, `analysis_date`, `latest_short_published`, the formatted `p
 
 ## Condition order
 
+If `shorts_tab_status` is `not_visible`, return exactly `publishing no shorts`.
+
+Before applying the conditions, check `shorts_status`. If it is `unavailable`, `not_requested`, or missing, return `insufficient data to evaluate shorts activity`. If it is `no_visible_shorts`, return `not creating shorts - missing a huge potential`. Only use records from a successfully collected Shorts tab. The returned sample is not the channel's total number of Shorts: when `total_shorts` is unknown, skip rules that require a verified total.
+
 1. If no Shorts are provided, return:
    not creating shorts - missing a huge potential
 
